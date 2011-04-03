@@ -7,3 +7,5 @@ env
 _build
 *.pyc
 *~
+pytyp.egg-info
+dist

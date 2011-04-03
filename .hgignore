@@ -1,0 +1,9 @@
+
+syntax: glob
+
+env
+.project
+.pydevproject
+_build
+*.pyc
+*~

@@ -26,6 +26,7 @@ Contents:
    pytyp
    pytyp.json
    pytyp.yaml
+   licence
 
 Indices and tables
 ==================

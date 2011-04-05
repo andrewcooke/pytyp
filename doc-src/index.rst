@@ -2,8 +2,9 @@
 Welcome to Pytyp's documentation!
 =================================
 
-Pytyp populates Python classes with data from JSON and YAML.  It can also work
-in reverse, generating JSON or YAML from existing classes.  This means:
+Pytyp extends the standard JSON and YAML modules to generate arbitrary Python
+classes (standard support builds only lists and dicts).  It can also work in
+reverse, generating JSON or YAML from existing classes.  This means:
 
  * Easier integration with systems that communicate using JSON and YAML.
 
@@ -16,7 +17,15 @@ package.  The :mod:`pytyp.json` and :mod:`pytyp.yaml` packages contain
 routines for interacting with those two formats.
 
 The mechanism used to implement decoding of "untyped" data streams from JSON
-and YAML also supports :ref:`strong_types`.
+and YAML also supports :ref:`strong_types` (runtime verification of values
+against type declarations).
+
+To install from `Pypi <http://pypi.python.org/pypi/pytyp>`_::
+
+  easy_install pytyp
+
+For source see `Google Code <http://code.google.com/p/pytyp/>`_; for support
+email `Andrew Cooke <mailto:andrew@acooke.org>`_.
 
 Contents:
 
@@ -26,7 +35,14 @@ Contents:
    pytyp
    pytyp.json
    pytyp.yaml
+   pytyp.spec
    licence
+
+.. note::
+
+   This project is Python 3 **only**.  You may be able to convert the code to
+   write classes to JSON/YAML to Python 2, but the reading code requires
+   type annotations, which are not available in earlier versions.
 
 Indices and tables
 ==================

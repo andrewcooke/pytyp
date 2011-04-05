@@ -58,8 +58,14 @@ def dumps(obj, **kargs):
     '''
     Serialize obj to a JSON formatted string.
 
-    Again, intended as a direct substitute for the function in Python's json
-    package.
+    This is intended as a direct substitute for the `dumps()` function in
+    Python's json package.  It supports the same options, except for `cls`
+    (which is used internally to provide Pytyp's own encoding).
+
+    Unlike the standard Python library, this will also encode Python classes
+    as long as they follow the conventions described in :ref:`encoding` (in
+    short that it has an attribute or property to provide a value for each
+    constructor parameter).
 
     :param obj: The Python object (or collection) to encode.
     :param kargs: Additional parameters are passed directly to the 
@@ -78,6 +84,24 @@ def dumps(obj, **kargs):
       >>> loads = make_loads(Example)
       >>> loads('{"foo": "abc"}')
       <Example(abc)>
+      
+    Lists, tuples and dicts of objects are also handled correctly:
+    
+      >>> dumps((Example('tuple'), {'a': Example('dict'), 'b': [Example('list')]}))
+      '[{"foo": "tuple"}, {"a": {"foo": "dict"}, "b": [{"foo": "list"}]}]'
+      
+    and this can be read back to Python classes, if the correct type specification 
+    is given to `make_loads()`: 
+      
+      >>> loads = make_loads((Example, {'a': Example, 'b': [Example]}))
+      >>> loads('[{"foo": "tuple"}, {"a": {"foo": "dict"}, "b": [{"foo": "list"}]}]')
+      (<Example(tuple)>, {'a': <Example(dict)>, 'b': [<Example(list)>]})
+      
+    Even nested classes can be written and read back correctly - see the example for 
+    `make_loads()` below.
+    
+    Type specifications are "pictures" of the expected type.  See 
+    :ref:`decoding` and :ref:`type_specs` for more details.
     '''
     return dumps_(obj, cls=JSONEncoder, **kargs)
 
@@ -171,5 +195,5 @@ def make_JSONDecoder(spec):
 
 if __name__ == "__main__":
     import doctest
-    doctest.testmod()
+    print(doctest.testmod())
 

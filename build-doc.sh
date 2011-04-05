@@ -1,7 +1,6 @@
 #!/bin/bash
 
-rm -fr doc
-
+rm -fr doc-src/_build
 pushd doc-src
-make html
+PYTHONPATH=../src make html
 popd

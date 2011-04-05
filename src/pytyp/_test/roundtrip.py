@@ -37,7 +37,9 @@ class RoundtripTest(TestCase):
     
     def assert_roundtrip(self, spec, obj, target=None, strict=True):
         target = target or obj
-        result = decode(spec, encode(obj, strict=strict))
+        intermediate = encode(obj, strict=strict)
+        #print(intermediate)
+        result = decode(spec, intermediate)
         assert result == target, result
     
     def test_tuple(self):

@@ -1,20 +1,17 @@
 from setuptools import setup
 
 setup(name='pytyp',
-      version='1.0',
+      version='1.1',
       description='JSON and YAML interoperation for Python 3 using type annotations',
       long_description='''
 Pytyp populates Python 3 classes with data from JSON and YAML. It can also
 work in reverse, generating JSON or YAML from existing classes. This means:
 
-Easier integration with systems that communicate using JSON and YAML.
-Configurations files in a format that is more natural and expressive than
-Python’s configparser library.  Although pytyp works with “ordinary” Python
-classes, you do need to follow some rules. These are explained in the
-documentation for the pytyp package. The pytyp.json and pytyp.yaml packages
-contain routines for interacting with those two formats.
+* Easier integration with systems that communicate using JSON and YAML.
 
-The mechanism used to implement decoding of “untyped” data streams from JSON
+* Configurations files in a format that is more natural and expressive than Python’s configparser library.
+
+The mechanism used to implement decoding of "untyped" data streams from JSON
 and YAML also supports runtime verification of values against type
 declarations for Python 3.
 ''',

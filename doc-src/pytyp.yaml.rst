@@ -2,20 +2,23 @@
 Pytyp.yaml Module
 =================
 
-This module provides basic support for mapping YAML data to Python classes.
+This module extends the popular PyYAML library so that it can write and return
+instances of Python classes.  This simplifies Python code that interacts with
+YAML (you don't need to use dicts where you would normally use a class, which
+means you can access values using attributes rather than named indices).
 
 It does not provide:
 
- * Versioning of data
+ * versioning of data or
 
- * Encoding of the root type specification
+ * encoding of the root type specification
 
 but these features can be built on top of the functionality provided here, if
-required (pyyaml also supports an encoding that embeds the Python type).
+required (PyYAML also supports an encoding that embeds the Python type).
 
 .. warning::
 
-  This module requires `pyyaml <http://pyyaml.org/wiki/PyYAML>`_.  If that
+  This module requires `PyYAML <http://pyyaml.org/wiki/PyYAML>`_.  If that
   package is not present then the functionality defined here will not be
   available.
 

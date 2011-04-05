@@ -28,7 +28,7 @@
 
 from unittest import TestCase
 
-from pytyp import checked
+from pytyp.spec import checked
 
 
 @checked

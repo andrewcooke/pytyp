@@ -27,12 +27,12 @@
 # MPL or the LGPL License.
 
 from unittest import TestCase
+from collections import namedtuple
 
 from pytyp.json import make_JSONDecoder, JSONEncoder
 from pytyp._test.support import SimpleArgs, NamedArgs, MixedArgs, TypedArgs, \
     Config, User, Permission
-from collections import namedtuple
-from pytyp import Choice
+from pytyp.spec import Choice
 
 
 class JSONDecoderTest(TestCase):
@@ -60,10 +60,6 @@ class JSONDecoderTest(TestCase):
                            '{"y": {"a": 1, "c": 3, "b": 2}, "x": {"q": 2, "p": 1}}', 
                            TypedArgs(NamedArgs(1, 2), SimpleArgs(1, 2, 3)))
         
-    def test_named_tuple(self):
-        NT = namedtuple('NT', 'a, b')
-        self.assert_decode(NT(int, str), '{"a": 1, "b":"two"}', NT(1, 'two'))
-
         
 class ConfigTest(TestCase):
     

@@ -2,23 +2,16 @@
 Welcome to Pytyp's documentation!
 =================================
 
-Pytyp extends the standard JSON and YAML modules to generate arbitrary Python
-classes (standard support builds only lists and dicts).  It can also work in
-reverse, generating JSON or YAML from existing classes.  This means:
+Pytyp offers:
 
- * Easier integration with systems that communicate using JSON and YAML.
+ * Easier integration with systems that communicate using :mod:`JSON
+   <pytyp.s11n.json>` and :mod:`YAML <pytyp.s11n.yaml>`.
 
  * Configurations files in a format that is more natural and expressive than
    Python's configparser library.
 
-Although pytyp works with "ordinary" Python classes, you do need to follow
-some rules.  These are explained in the documentation for the :mod:`pytyp`
-package.  The :mod:`pytyp.json` and :mod:`pytyp.yaml` packages contain
-routines for interacting with those two formats.
-
-The mechanism used to implement decoding of "untyped" data streams from JSON
-and YAML also supports :ref:`strong_types` (runtime verification of values
-against type declarations).
+ * Experimental support for :ref:`strong_types` (runtime verification of
+   values against type declarations, typed attributes, and dispatch by type).
 
 To install from `Pypi <http://pypi.python.org/pypi/pytyp>`_::
 
@@ -33,9 +26,11 @@ Contents:
    :maxdepth: 1
 
    pytyp
-   pytyp.json
-   pytyp.yaml
-   pytyp.spec
+   pytyp.s11n.json
+   pytyp.s11n.yaml
+   pytyp.spec.base
+   pytyp.spec.check
+   pytyp.spec.future
    licence
 
 .. note::

@@ -1,41 +1,32 @@
 
-Pytyp Package
-=============
+Introduction (pytyp)
+====================
 
-Pytyp can *encode* from Python classes to dicts.  It can also *decode* dicts
-back into Python classes.
+Pytyp is a library of useful Python utilities that are loosely based on
+the "types" of objects.
 
-Although they are designed to work together, each of these processes has
-different requirements.  If you only want to move data in one direction you
-only need to comply with the requirements for that process.
+The most important of these support encoding and decoding data to and from
+:mod:`JSON <pytyp.s11n.json>` and :mod:`YAML <pytyp.s11n.yaml>`.  Pytyp
+extends the standard support (which works for lists and dicts) to handle
+user-defined Python classes.
 
-Routines that use the encoding and decoding describe here to inter-operate
-with JSON and YAML are available in the sub-packages :mod:`pytyp.json` and
-:mod:`pytyp.yaml`.  The documentation in this section and :mod:`pytyp.types`
-focusses on the underlying implementation.
+For more information on object serialization see :mod:`pytyp.s11n`.
+
+Pytyp contains some more "experimental" code that extends the work used to
+support JSON and YAML encoding and explores how a "stronger typed" Python
+might work.
+
+For more information on type-related experiments see :mod:`pytyp.spec`.
 
 .. automodule:: pytyp
-
-.. _encoding:
-
-Encoding
---------
-
-.. autodata:: DEFAULT_RAW
-.. autofunction:: encode
-
-.. _decoding:
-
-Decoding
---------
-
-.. autofunction:: decode
 
 Subpackages
 -----------
 
 .. toctree::
+   :maxdepth: 1
 
-    pytyp.json
-    pytyp.yaml
+   pytyp.s11n
+   pytyp.spec
+   pytyp.util
 

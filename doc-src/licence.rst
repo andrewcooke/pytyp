@@ -26,7 +26,7 @@ Cooke (andrew@acooke.org).
   the License for the specific language governing rights and
   limitations under the License.
   
-  The Original Code is Lepl (http://www.acooke.org/lepl) The Initial
+  The Original Code is Pytyp (http://www.acooke.org/pytyp) The Initial
   Developer of the Original Code is Andrew Cooke.  Portions created by
   the Initial Developer are Copyright (C) 2011 Andrew Cooke. All
   Rights Reserved.

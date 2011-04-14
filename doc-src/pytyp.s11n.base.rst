@@ -1,0 +1,40 @@
+
+Serialisation Support (pytyp.s11n.base)
+=======================================
+
+Pytyp can *encode* from Python classes to dicts.  It can also *decode* dicts
+back into Python classes.
+
+Although they are designed to work together, each of these processes has
+different requirements.  If you only want to move data in one direction you
+only need to comply with the requirements for that process.
+
+Routines that use the encoding and decoding described here to inter-operate
+with JSON and YAML are available in the sub-packages :mod:`pytyp.s11n.json`
+and :mod:`pytyp.s11n.yaml`.  The documentation in this section and (to a
+lesser extent) :mod:`pytyp.spec` describes the underlying implementation.
+
+.. automodule:: pytyp.s11n.base
+
+.. _encoding:
+
+Encoding Support
+----------------
+
+.. autodata:: DEFAULT_RAW
+.. autofunction:: encode
+
+.. _decoding:
+
+Decoding Support
+----------------
+
+.. autofunction:: decode
+
+Subpackages
+-----------
+
+.. toctree::
+
+    pytyp.s11n.json
+    pytyp.s11n.yaml

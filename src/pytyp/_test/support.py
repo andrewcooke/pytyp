@@ -26,7 +26,11 @@
 # above, a recipient may use your version of this file under either the
 # MPL or the LGPL License.
 
-_BORING = dir(type('dummy', (object,), {}))
+'''
+Support classes for tests.
+'''
+
+from pytyp.util import items
 
 
 class AttributeEquality():
@@ -35,9 +39,7 @@ class AttributeEquality():
         if not isinstance(other, type(self)):
             return False
         def to_dict(obj):
-            return dict((name, getattr(obj, name))
-                        for name in dir(obj)
-                        if name not in _BORING)
+            return dict(items(obj))
         return to_dict(self) == to_dict(other)
 
 

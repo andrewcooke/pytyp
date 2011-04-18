@@ -131,7 +131,6 @@ class TreeFunctorTest(TestCase):
     def assert_functor(self, functor):
         Tree = functor(int)
         t1 = Tree()
-        t1.value = 'poot'
         t1.add(1)
         try:
             t1.add('bad')

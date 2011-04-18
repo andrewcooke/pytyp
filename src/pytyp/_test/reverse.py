@@ -30,6 +30,8 @@ from unittest import TestCase
 from inspect import formatargspec, getfullargspec
 
 from pytyp._test.support import SimpleArgs, TypedArgs, NamedArgs
+from abc import abstractmethod, ABCMeta
+from collections import namedtuple
 
 
 class ReverseTest(TestCase):
@@ -46,6 +48,51 @@ class ReverseTest(TestCase):
         assert 'return' in ann, ann
         assert ann['return'] == int
         assert len(ann) == 3
+        
+    def test_abc(self):
+        
+        class MyAbc(metaclass=ABCMeta):
+            @abstractmethod
+            def foo(self): pass
+            
+        class MyExample:
+            def foo(self): return 42
+            
+        assert not isinstance(MyExample(), MyAbc)
+        
+        MyAbc.register(MyExample)
+        assert isinstance(MyExample(), MyAbc)
+        
+        class MyAbc2(metaclass=ABCMeta):
+            @abstractmethod
+            def foo(self): pass
+        
+        class MyExample2:
+            def foo(self): return 42
+            
+        MyAbc2.register(MyExample2)
+        assert isinstance(MyExample2(), MyAbc2)
+        assert not isinstance(MyExample2(), MyAbc)
+        
+        MyAbc.register(MyAbc2)
+        assert isinstance(MyExample2(), MyAbc) # transitive!
+        
+        class MyExample3(MyExample2):
+            pass
+        
+        assert isinstance(MyExample3(), MyAbc)
+        assert isinstance(MyExample3(), MyAbc2)
+
+    def test_named_tuples(self):
+        NT = namedtuple('NT', 'a, b')
+        nt = NT(1, 'twp')
+        assert nt.a == 1
+        try:
+            namedtuple('NT', 'a:int, b:str')
+            assert False, 'Expected error'
+        except ValueError:
+            pass
+        
 
 
 def mustbe(n):

@@ -82,6 +82,21 @@ class ReverseTest(TestCase):
         
         assert isinstance(MyExample3(), MyAbc)
         assert isinstance(MyExample3(), MyAbc2)
+        
+        class MyAbc4(metaclass=ABCMeta):
+            @abstractmethod
+            def foo(self): pass
+        
+        class MyExample4:
+            def foo(self): return 42
+            
+        ex4 = MyExample4()
+        try:
+            MyAbc4.register(ex4)
+            assert False, 'Expected error'
+        except TypeError:
+            pass
+        
 
     def test_named_tuples(self):
         NT = namedtuple('NT', 'a, b')
@@ -93,8 +108,7 @@ class ReverseTest(TestCase):
         except ValueError:
             pass
         
-
-
+        
 def mustbe(n):
     def decorator(f):
         def wrapper(self, x):

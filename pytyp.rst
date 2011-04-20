@@ -126,9 +126,9 @@ such examples can generally be explained in terms of attribute access via
 the function's argument).
 
 I do not know if *every* operation can be explained in terms of attributes,
-but my strong impression is that this is the intention: Python is designed to
-describe all "type-related" runtime behaviour in terms of attribute access.
-In this way it implements (and defines) duck typing.
+but my strong impression is that this is the intention: **Python's runtime
+behaviour can be modelled in terms of attribute access**.  In this way it
+implements (and defines) duck typing.
 
 Recent Extensions
 ~~~~~~~~~~~~~~~~~
@@ -159,17 +159,23 @@ duck types [#]_::
 
 Instead, ``MyExample`` must either subclass ``MyAbc`` or "register" itself
 (populating a lookup table used by ``isinstance()``).  I will call this
-approach "witness typing" since the ABC acts as a witness to the veracity of
-the registered (or subclass) type [#]_.
+approach "witness typing" since **the ABC acts only as a witness to the
+veracity of the registered (or subclass) type; it does not perform a runtime
+check of the attributes** [#]_.
 
 .. [#] No connection with witness types in Haskell is implied, although the
    idea is loosely related.
 
 Second, Python 3 supports (but does enforce) type annotations.  These are
-metadata associated with functions.  For example, the following is valid::
+metadata associated with functions [#]_.  For example, the following is
+valid::
 
   def func(a: int, b:str) -> list:
       return [a, b]
+
+.. [#] Python docs call them "function annotations", but the use cases in
+   PEP3107 all refer to types (the PEP does not explain why only functions
+   were considered, except that generator annotations were "ugly").
 
 Type annotations are not interpreted or enforced by the language runtime.
 They are added to the function metadata and exposed through Python's
@@ -184,7 +190,8 @@ of object attributes.
 
 Recent work has started to build on this foundation by reifying collections of
 attributes (ABCs) and allowing metdata (formatted in a manner traditionally
-associated with types) to be specified on functions.
+associated with types) to be specified on functions.  However, ABCs act only
+as a witness to types; they do not perform any runtime checks.
 
 A Pythonic Extension
 --------------------
@@ -237,9 +244,9 @@ subclasses).  A better syntax would be ``Map(a=int, b=str)`` or ``Map(int,
 str)`` (where integer indices are implicit).
    
 The step from sequences to maps is more significant than a simple change of
-syntax.  When we try to translate ``Map()`` back into ABCs with type
-annotations we find that we need dependent types (the type of the return value
-from ``__getitem__(key)`` depends on the argument, ``key``).  This is a
+syntax.  **When we try to translate ``Map()`` back into ABCs with type
+annotations we find that we need dependent types** (the type of the return
+value from ``__getitem__(key)`` depends on the argument, ``key``).  This is a
 consequence of Python using a parametric interface to access records — it will
 not apply to attribute access on objects.
 
@@ -286,8 +293,13 @@ type theory: parametric polymorphism; product types; and sum types.
 Polymorphism
 ............
 
-Since we started with data structurs we have already addressed this point —
-``Seq(x)`` is polymorphic in ``x``, for example.
+Since we started with data structurs we have already addressed this point:
+``Seq(x)`` is polymorphic in ``x``, for example.  However, it's worth drawing
+attention to an important point, that **polymorphism occurs naturally in
+Python data structures at the level of instances, not classes**.  This
+contrasts with the current implementation of witness typing, ABCs, which is at
+the class level, and explains the need to introduce a (clumsy) extra class,
+``IntSequence``, in the opening example.
 
 If we assume that the type system is inclusive (that subclasses can substitute
 for classes) then unbounded polymorphism can be specified using ``object``.
@@ -350,31 +362,60 @@ integers as ``Alt(none=None, value=int)`` [#]_.
 Implementation
 ~~~~~~~~~~~~~~
 
-Design Choices
-..............
+Approach
+........
 
 The previous sections have explored a variety of ideas.  Now we will consider
-a concrete, pythonic implementation.  This will support two general uses,
-identified in `Semantics`_ above: verification and expansion.
+an implementation.  This will support two general uses, identified in
+`Semantics`_ above: verification and expansion.
 
-There were two possible implementations for verification.  One was through
-expansion, which we can use as a test for the more general expansion support.
-The other was through some kind of extension to witness typing.
+Two possible approaches for verification were discussed above.  One was
+through expansion, which we can use as a test for the more general expansion
+support.  The other required an extension to witness typing.
 
 The most obvious way to extend witness typing was used at the start of this
-paper: adding type annotations to ABCs.  However, we have discussed several
-problems with this approach.  First, it is incomplete: attributes and
-generators do not support annotations, and scope issues complicate some common
-uses.  Second, it ignores the correlations between the types of various
-attributes (requiring much duplication).  Third, it is verbose, particularly
-when using the standard container classes, which would need to be subclasses
-for every distinct use.  Fourth, dependent types would be needed to handle
-``dict``.
+paper — adding type annotations to ABCs — but has several problems.  First, it
+is incomplete: attributes and generators do not support annotations, and scope
+issues complicate some common uses.  Second, dependent types would be needed
+to handle ``dict``.  Third, it is verbose, particularly when using the
+standard container classes, which must to be subclassed for every distinct
+use, but also because it ignores correlations between the types of different
+attributes.  Fourth, it is misleading (as are current ABCs) in that it
+emphasises details that are not verified by the witness–based implementation.
 
 Instead, I will focus on a registration–based approach.  This will extend the
 ABC ``register()`` method with parameters to indicate polymorphism, the
 ability to register instances, and a fallback to a structural approach when
 needed.
+
+Structure
+.........
+
+The existing ABC metaclasses can be subclasses to include polymorphism via
+``Map()`` and ``Seq()``.  A new class can be added for ``Alt`` (and aliased
+for ``Opt()``).
+
+Lower level, "atomic" classes like ``int`` will work directly via
+``isinstance()`` for verification (while expansion will use callbacks; see
+below).  User classes can do this, with ``__instancecheck__`` and
+``__subclasscheck__``, but we should add some way to "bolt on" polymorphic
+witnesses to classes — ``Cls(UserClass)(int, str)`` or, more simply,
+``Cls(UserClass, int, str)`` [#]_.
+
+.. [#] The former is appealing, at least on first sight, since it suggests a
+   consistent basis for polymorphism — ``Map()`` can be defined as
+   ``Cls(Mapping)``, for example — but the details don't work out so well:
+   ``Mapping`` is already an ABC, while ``UserClass`` isn't; in the future you
+   might hope that ``Map`` and ``Mapping`` would be merged; automating the
+   construction of ABCs from concrete classes has no real use in itsef, only
+   as a half-way house to polymorphic witnesses.
+
+There is also an issue related to mutability: should it be possible to
+register classes that cannot be hashed?  A pythonic approach would say no,
+even though I personally think this could be useful (the alternative, using
+structural verification of each entry, is expensive for lists).  One
+resolution might be an extension to mutable containers that allow changes to
+be detected.
 
 Expansion
 .........
@@ -387,10 +428,24 @@ intends to use these to coerce or otherwise process the data.
 
 Care will be needed to handle loops gracefully.
 
+Extensibility?  (Cls)
+
 Verification
 ............
 
-Much to do here.
+Although polymorphism usually occurs at the instance level we do not want to
+exclude it at the class level.  So an ABC with parametric polymorphism, like
+``Sequence(int)`` should support registration of instances *and* subclassing;
+it must also support the original use without the polymorphism.
+
+To avoid confusion I use distinct, shorter names in ``pytyp``, but otherwise
+can achieve all the above by treating ``__new__`` as a class (not instance)
+factory in the restricted case that ``Seq()`` is being called to create a
+subtype.
+
+Extensibility?
+
+
 
 Examples
 ~~~~~~~~
@@ -581,6 +636,21 @@ Language v Library
 
 Backfitting existing APIs.
 
+Consistency
+...........
+
+I understand that Python has grown in an irganic manner, and that this is a
+strenght of the language.  I also believe that the cautious, inremental manner
+in whch it has been developed has been a benefit.  But still, oh my god, why,
+why, why, are there so many inconsistencies and irregularities?  Why are
+namedtuples only half implemented?  Why is scope still broken?  Why are type
+annotations available only on functions?
+
+Mutable State and Collections
+.............................
+
+A flag that indicates change?
+
 Conclusions
 -----------
 
@@ -594,3 +664,4 @@ define everything in terms of new abcs + use register.  make the abcs
 parametric.  are abcs transitive(sp?)
 
 types increase granularity of abcs to instances.
+

@@ -109,6 +109,20 @@ class ReverseTest(TestCase):
             pass
         
         
+    def test_instancecheck(self):
+        class A():
+            @classmethod
+            def __instancecheck__(cls, instance):
+                return True
+        assert not isinstance(42, A)
+        class B(metaclass=ABCMeta):
+            @classmethod
+            def __instancecheck__(cls, instance):
+                return True
+        assert not isinstance(42, B)
+        
+
+
 def mustbe(n):
     def decorator(f):
         def wrapper(self, x):

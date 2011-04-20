@@ -103,9 +103,9 @@ class MapTest(TestCase):
     def test_register(self):
         class Baz(): pass
         baz = Baz()
-        assert not isinstance(baz, Map(a=int, b=int))
+        assert not isinstance(baz, Map(a=int, b=str))
         Map(a=int, b=str).register_instance(baz)
-        assert isinstance(baz, Map(a=int, b=int))
+        assert isinstance(baz, Map(a=int, b=str))
         
         
 class AltTest(TestCase):
@@ -156,7 +156,6 @@ class ClsTest(TestCase):
         assert not isinstance(baz, Cls(Baz, int))
         Cls(Baz, int).register_instance(baz)
         assert isinstance(bar, Cls(Bar, int))
-        print('---------')
         assert not isinstance(baz, Cls(Bar, int))
         assert isinstance(baz, Cls(Baz, int))
         

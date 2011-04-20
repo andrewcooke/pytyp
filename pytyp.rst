@@ -388,19 +388,50 @@ ABC ``register()`` method with parameters to indicate polymorphism, the
 ability to register instances, and a fallback to a structural approach when
 needed.
 
-Structure
-.........
+Library Structure
+.................
 
-The existing ABC metaclasses can be subclasses to include polymorphism via
-``Map()`` and ``Seq()``.  A new class can be added for ``Alt`` (and aliased
-for ``Opt()``).
+Existing ABCs can be used in two ways: via inheritance or by registration.  We
+can preserve this while adding polymorphism by subclassing (``class
+Seq(Sequence)``) and then intercepting *direct* calls to the constructor to
+create another level of witnesses, specific to a particular type specification
+[#]_.
 
-Lower level, "atomic" classes like ``int`` will work directly via
-``isinstance()`` for verification (while expansion will use callbacks; see
-below).  User classes can do this, with ``__instancecheck__`` and
-``__subclasscheck__``, but we should add some way to "bolt on" polymorphic
-witnesses to classes — ``Cls(UserClass)(int, str)`` or, more simply,
-``Cls(UserClass, int, str)`` [#]_.
+.. [#] See ``pytyp`` source for full details.
+
+So ``Seq(Int)`` creates a subclass of ``Seq`` which can be either subclassed
+or used for registration::
+
+    >>> class MyIntList(list, Seq(int)): pass
+    >>> isinstance(MyIntList(), Seq(int))
+    True
+    >>> isinstance(MyIntList(), Seq)
+    True
+    >>> isinstance(MyIntList(), Sequence)
+    True
+    >>> isinstance(MyIntList(), Seq(float))
+    False
+    >>> Seq(int).register_instance(random_object)
+    >>> isinstance(random_object, Seq(int))
+    True
+
+The ``Seq()`` level classes needed only to add extra functionality to the
+existing classes.  They could be removed if support for polymorphism was added
+directly to the core language.
+
+To complete the implementation we must also override the instance check to
+include the new registry.  This is more difficult than it appears: despite the
+language in PEP 3119 [#]_ and Issue 1708353 [#]_ ``__instancecheck__()`` can
+only be overrriden *on the metaclass* [#]_.  Since providing a new metaclass
+would break inheritance of the existing ABCs ``pytyp`` uses a "monkey patch"
+to delegate to ``__cls_instancecheck__()`` on the class, if defined.
+
+.. [#] http://www.python.org/dev/peps/pep-3119/
+.. [#] http://bugs.python.org/issue1708353
+.. [#] http://docs.python.org/reference/datamodel.html#customizing-instance-and-subclass-checks
+
+For user–defined classes we need another level — ``Cls(UserClass)(int, str)``
+or, more simply, ``Cls(UserClass, int, str)`` [#]_.
 
 .. [#] The former is appealing, at least on first sight, since it suggests a
    consistent basis for polymorphism — ``Map()`` can be defined as
@@ -410,12 +441,16 @@ witnesses to classes — ``Cls(UserClass)(int, str)`` or, more simply,
    construction of ABCs from concrete classes has no real use in itsef, only
    as a half-way house to polymorphic witnesses.
 
-There is also an issue related to mutability: should it be possible to
-register classes that cannot be hashed?  A pythonic approach would say no,
-even though I personally think this could be useful (the alternative, using
-structural verification of each entry, is expensive for lists).  One
-resolution might be an extension to mutable containers that allow changes to
-be detected.
+There is an issue related to mutability: should it be possible to register
+classes that cannot be hashed?  A pythonic approach would say no, even though
+I personally think this could be useful (the alternative, using structural
+verification of each entry, is expensive for lists).  One resolution might be
+an extension to mutable containers that allow changes to be detected.
+
+__instancecheck__
+.................
+
+To implement the 
 
 Expansion
 .........

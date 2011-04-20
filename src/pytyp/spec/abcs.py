@@ -2,8 +2,27 @@
 from abc import ABCMeta
 from collections import Sequence, Mapping
 from itertools import count
+from time import time
 from weakref import WeakSet, WeakKeyDictionary
 
+
+PYTYP_PATCHED = 'pytyp_patched'
+
+if not hasattr(ABCMeta, PYTYP_PATCHED):
+    original = ABCMeta.__instancecheck__
+
+    def replacement_instancecheck(cls, instance):
+        try:
+            result = cls.__cls_instancecheck__(instance)
+            if result is not None:
+                return result
+        except AttributeError:
+            pass
+        return original(cls, instance)
+
+    ABCMeta.__instancecheck__ = replacement_instancecheck
+    setattr(ABCMeta, PYTYP_PATCHED, time())
+        
 
 def type_factory(cls, *args, **kargs):
     types = dict(kargs)
@@ -13,7 +32,6 @@ def type_factory(cls, *args, **kargs):
     # convert to tuple of ordered tuples for repeatable hashing
     types = tuple((key, types[key]) for key in sorted(types.keys()))
     if types not in cls._abc_polymorphic_cache:
-        print('new class')
         
         class Polymorphic(cls):
             
@@ -26,22 +44,15 @@ def type_factory(cls, *args, **kargs):
                     return  # Already an instance
                 # TODO - do we need to check for circularity? (see abc code)
                 cls._abc_instance_registry.add(instance)
-
-        def set_instancecheck(polymorphic):
-            previous = polymorphic.__class__.__instancecheck__
-            def __instancecheck__(cls, instance):
+                
+            @classmethod
+            def __cls_instancecheck__(cls, instance):
                 try:
-                    if instance in Polymorphic._abc_instance_registry:
-                        print('locally true')
+                    if instance in cls._abc_instance_registry:
                         return True
-                except TypeError:
+                except (TypeError, AttributeError):
                     pass
-                x = previous(cls, instance)
-                print('parent', x)
-                return x
-            polymorphic.__class__.__instancecheck__ = __instancecheck__
         
-        set_instancecheck(Polymorphic)
         cls._abc_polymorphic_cache[types] = Polymorphic
     return cls._abc_polymorphic_cache[types]
 

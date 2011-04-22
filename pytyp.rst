@@ -244,11 +244,11 @@ subclasses).  A better syntax would be ``Map(a=int, b=str)`` or ``Map(int,
 str)`` (where integer indices are implicit).
    
 The step from sequences to maps is more significant than a simple change of
-syntax.  **When we try to translate ``Map()`` back into ABCs with type
+syntax.  **When we try to translate** ``Map()`` **back into ABCs with type
 annotations we find that we need dependent types** (the type of the return
 value from ``__getitem__(key)`` depends on the argument, ``key``).  This is a
-consequence of Python using a parametric interface to access records — it will
-not apply to attribute access on objects.
+consequence of Python using a parametric interface to access records, so it
+will not apply to attribute access on objects.
 
 Semantics
 .........
@@ -260,18 +260,24 @@ arguments, or to specify how data can be decoded (see below for code).
 On reflection I can find three broad uses for types: verification;
 identification; and expansion.
 
-Verification of a value's type (against some declaration) can be performed in
-various ways.  We might examine the value structurally, comparing it against
-the type specification piece by piece.  This approach seems best suited to
-"data" types (lists, tuples and dictionaries) which tend to be used in a
-polymorphic manner [#]_.  Alternatively, we can use witness typing, extended
-to include types, which seems more suited to user–defined classes.  Exactly
-how ABCs are extended to include types will be addressed in `Implementation`_
-below.
+**Verification** of a value's type (against some declaration) can be performed
+in various ways.  We might examine the value structurally, comparing it
+against the type specification piece by piece.  This approach seems best
+suited to "data" types (lists, tuples and dictionaries) which tend to be used
+in a polymorphic manner [#]_.  Alternatively, we can use witness typing,
+extended to include types, which seems more suited to user–defined classes.
 
 .. [#] Assuming that the computational cost is not prohibitive.
 
-Identification of a value's type, although superficially similar to
+That ``isinstance([1,2,3], Seq(int))`` should return ``True`` is intuitive,
+but implies a significant change to the language semantics — ``isinstance()``
+now depends on the state of an instance as well as its class.
+
+In other words, the relationship between ``isinstance()`` and ``issubclass()``
+has changed.  Before, the former could be expressed in terms of the latter.
+This is not true when ``isinstance()`` is concerned with instance state.
+
+**Identification** of a value's type, although superficially similar to
 verfication, is a harder problem.  In some simpler cases we may have a set of
 candidate types, in which case we can verify them in turn; in other cases the
 instance's class may inherit from one or more ABCs (this would still need
@@ -279,10 +285,10 @@ extending to include type information); but I don't see a good, "pythonic"
 solution to the general problem.  Perhaps type witnesses (ABCs extended to
 include type information) could pool registry information?
 
-Expansion of a value by type covers a variety of uses where we want to operate
-on some sub-set of the data and, perhaps, recombine the results into a similar
-structure to before.  One example is the decoding of JSON values by ``pytyp``
-(see example below).  Another is structural type verification.
+**Expansion** of a value by type covers a variety of uses where we want to
+operate on some sub-set of the data and, perhaps, recombine the results into a
+similar structure to before.  One example is the decoding of JSON values by
+``pytyp`` (see example below).  Another is structural type verification.
 
 A Little Formality
 ~~~~~~~~~~~~~~~~~~
@@ -466,7 +472,17 @@ structural verification of each entry, is expensive for lists).  One
 resolution might be an extension to mutable containers that allow changes to
 be detected.
 
-Extensibility?
+Extensibility
+.............
+
+The ``pytyp`` library is intended to be extensible; the set of polymorphic
+ABCs can be extended by users.  This is achieved in the normal Python way,
+using a class–based approach with informal protocols based around methods.
+For example, the ``normalize()`` function, which converts informal
+specifications like ``[int]`` to ABC–based equivalents (``Seq(int)``),
+delegates to ``_normalize()`` methods on the ABCs used (and passes itself as
+an argument so that recursive conversion of nested values automatically use
+any replacement).
 
 Examples
 ~~~~~~~~

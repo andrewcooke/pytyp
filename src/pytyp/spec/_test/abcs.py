@@ -6,7 +6,7 @@ from unittest import TestCase
 from pytyp.spec.abcs import Seq, Map, Alt, Opt, Cls, normalize, format
 
 
-class SeqAbcTest(TestCase):
+class SeqTest(TestCase):
     
     def test_simple(self):
         sint = Seq(int) 
@@ -79,16 +79,21 @@ class SeqAbcTest(TestCase):
         assert isinstance(boo, Seq)
         assert isinstance(boo, Sequence)
         assert not isinstance(boo, Seq(int))
+        
+    def test_is_subclass(self):
+        assert issubclass(list, Sequence)
+        assert issubclass(list, Seq)
+        assert not issubclass(list, Seq(int))
 
-
-class SeqRegisterTest(TestCase):
-    
     def test_register(self):
         class Foo: pass
         foo = Foo()
         assert not isinstance(foo, Seq(int))
         Seq(int).register_instance(foo)
         assert isinstance(foo, Seq(int))
+        
+    def test_structural(self):
+        assert isinstance([1,2,3], Seq(int))
         
         
 class MapTest(TestCase):

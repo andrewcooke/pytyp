@@ -3,7 +3,7 @@ from abc import ABCMeta
 from collections import Sequence
 from unittest import TestCase
 
-from pytyp.spec.abcs import Seq, Map, Alt, Opt, Cls
+from pytyp.spec.abcs import Seq, Map, Alt, Opt, Cls, normalize, format
 
 
 class SeqAbcTest(TestCase):
@@ -132,6 +132,7 @@ class OptTest(TestCase):
         assert isinstance(bar, Opt(int))
         assert not isinstance(bar, Opt(str))
         assert isinstance(bar, Alt(none=None, value=int))
+        assert not isinstance(bar, Alt(none=None, value=str))
         
     def test_register(self):
         class Baz(): pass
@@ -139,6 +140,10 @@ class OptTest(TestCase):
         assert not isinstance(baz, Opt(int))
         Opt(int).register_instance(baz)
         assert isinstance(baz, Opt(int))
+        
+    def test_normalize(self):
+        foo = normalize(Opt([int]))
+        assert foo == Alt(none=None, value=Seq(int))
         
         
 class ClsTest(TestCase):

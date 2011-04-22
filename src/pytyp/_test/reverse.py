@@ -114,12 +114,29 @@ class ReverseTest(TestCase):
             @classmethod
             def __instancecheck__(cls, instance):
                 return True
-        assert not isinstance(42, A)
+        assert not isinstance(42, A) # not an instance?!
         class B(metaclass=ABCMeta):
             @classmethod
             def __instancecheck__(cls, instance):
                 return True
-        assert not isinstance(42, B)
+        assert not isinstance(42, B) # not an instance?!
+        
+        
+    def test_kargs(self):
+        def foo(**kargs):
+            return kargs
+        k = foo(**{'?a':1})
+        assert '?a' in k
+        # type error - keywords must be strings - below
+#        k = foo(**{2:3})
+#        assert 2 in k
+        # invalid syntax below
+#        k = foo(?a=1)
+#        assert '?a' in k
+        def bar(*args, a=1, **kargs):
+            return (args, kargs)
+        assert bar(2) == ((2,), {}), bar(2)
+        assert bar(2,b=3) == ((2,), {'b':3}), bar(2,b=3)
         
 
 

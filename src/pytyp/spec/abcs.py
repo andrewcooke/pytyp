@@ -1,28 +1,10 @@
 
 from abc import ABCMeta
-from collections import Sequence, Mapping, ByteString
+from collections import Sequence, Mapping, ByteString, MutableSequence, MutableMapping
 from itertools import count
 from numbers import Number
 from time import time
 from weakref import WeakSet, WeakKeyDictionary
-
-
-PYTYP_PATCHED = 'pytyp_patched'
-
-if not hasattr(ABCMeta, PYTYP_PATCHED):
-
-    instance_check = ABCMeta.__instancecheck__
-    def replacement_instancecheck(cls, instance):
-        try:
-            result = cls.__instancehook__(instance)
-            if result is not NotImplemented:
-                return result
-        except AttributeError:
-            pass
-        return instance_check(cls, instance)
-
-    ABCMeta.__instancecheck__ = replacement_instancecheck
-    setattr(ABCMeta, PYTYP_PATCHED, time())
 
 
 ATOMIC = {Number, ByteString, str}
@@ -59,7 +41,9 @@ def normalize(spec):
     '''
     if isinstance(spec, Delayed):
         spec = spec.spec
-    if isinstance(spec, list):
+    if spec is None:
+        spec = type(None)
+    elif isinstance(spec, list):
         if len(spec) == 1:
             return Seq(normalize(spec[0]))
         elif len(spec) == 0:
@@ -90,10 +74,6 @@ def format(spec):
         return spec.__name__
     
     
-def verify(spec, value, normalized=False):
-    pass
-
-
 def _hashable_types(*args, **kargs):
     types = dict((name, normalize(karg)) for (name, karg) in kargs.items())
     for (index, arg) in zip(count(), args):
@@ -128,17 +108,6 @@ def _polymorphic_subclass(abc, *args, _normalize=None, **kargs):
                 pass
             return cls._structuralcheck(instance)
                 
-        @classmethod
-        def __subclasshook__(cls, subclass):
-            return NotImplemented # punt to higher level
-        
-        @classmethod
-        def _structuralcheck(cls, instance):
-            if issubclass(type(instance), abc):
-                #return True
-                pass
-            return NotImplemented
-            
         # replaced a standard class definition with this to help with debugging
         # as it was confusing when everything had the same name
         subclass = type(abc)(abc.__name__ + '_' + str(hash(types)),
@@ -146,9 +115,7 @@ def _polymorphic_subclass(abc, *args, _normalize=None, **kargs):
                              {'_abc_type_arguments': types,
                               '_abc_instance_registry': WeakSet(),
                               'register_instance': register_instance,
-                              '__instancehook__': __instancehook__,
-#                              '__subclasshook__': __subclasshook__,
-                              '_structuralcheck': _structuralcheck})
+                              '__instancehook__': __instancehook__})
                 
         abc._abc_polymorphic_cache[types] = subclass
     return abc._abc_polymorphic_cache[types]
@@ -173,12 +140,16 @@ class Seq(Sequence):
         return NotImplemented
         
     @classmethod
-    def _expand(cls, value, callback):
-        try:
-            return callback((None, v, cls._abc_type_arguments[0][1]) for v in value)
-        except AttributeError:
-            return callback((None, v, None) for v in value)
-        
+    def _expand(cls, instance, callback):
+        def vsn():
+            try:
+                (name, spec) = cls._abc_type_arguments[0]
+            except AttributeError:
+                (name, spec) = (None, None)
+            for value in instance:
+                yield (value, spec, name)
+        return callback(vsn())
+            
     @classmethod
     def _normalize(cls, callback):
         try:
@@ -186,21 +157,27 @@ class Seq(Sequence):
         except AttributeError:
             return Seq
         
-    @classmethod
-    def _verify(cls, value):
-        if isinstance(value, cls):
-            return
-        if isinstance(type(value), cls):
-            if cls._abc_type_arguments:
-                return False
+    @staticmethod
+    def __expand_is_instance(vsn):
+        try:
+            for (v, s, _n) in vsn:
+                if not isinstance(v, s):
+                    return False
+            return True
+        except TypeError:
+            return False
         
+    @classmethod
+    def _structuralcheck(cls, instance):
+        return cls._expand(instance, cls.__expand_is_instance)
+            
     @classmethod
     def _repr(cls):
         try:
             return 'Seq({0})'.format(format(cls._abc_type_arguments[0][1]))
         except AttributeError:
             return 'Seq'
-        
+
 
 class Map(Mapping):
     
@@ -233,29 +210,28 @@ class Map(Mapping):
         
     @classmethod
     def _expand(cls, value, callback):
-        if hasattr(cls, '_abc_type_arguments'):
+        def vsn():
             try:
-                names = set(value.keys())
+                names = value.keys()
             except AttributeError:
-                names = set(range(len(value)))
-            # drop existing and optional names
-            for (name, spec) in cls._abc_type_arguments:
-                try:
-                    value[Map.OptKey.unpack(name)]
-                    found = True
-                except KeyError:
-                    if isinstance(name, Map.OptKey):
-                        name = name.name
-                        found = True
-                if not found:
-                    raise TypeError('Missing value for {0}'.format(name))
-                names.discard(name)
-            if names:
-                raise TypeError('Additional field(s): {0}'.format(', '.join(names)))
-            return callback((Opt.unpack(name), value[Opt.unpack(name)], spec[name]) 
-                            for name in spec if Opt.unpack(name) in value)
-        else:
-            return callback((name, value[name], None) for name in value) 
+                names = range(len(value))
+            if hasattr(cls, '_abc_type_arguments'):
+                names = set(names)
+                # drop existing and optional names
+                for (name, spec) in cls._abc_type_arguments:
+                    unpacked = Map.OptKey.unpack(name)
+                    try:
+                        yield (value[unpacked], spec, unpacked) 
+                    except KeyError:
+                        if not isinstance(name, Map.OptKey):
+                            raise TypeError('Missing value for {0}'.format(name))
+                    names.discard(unpacked)
+                if names:
+                    raise TypeError('Additional field(s): {0}'.format(', '.join(names)))
+            else:
+                for name in names:
+                    yield (value[name], None, name)
+        return callback(vsn())
         
     @classmethod
     def _normalize(cls, callback):
@@ -265,6 +241,20 @@ class Map(Mapping):
         except AttributeError:
             return Map
     
+    @staticmethod
+    def __expand_is_instance(vsn):
+        try:
+            for (v, s, _n) in vsn:
+                if not isinstance(v, s):
+                    return False
+            return True
+        except TypeError:
+            return False
+
+    @classmethod
+    def _structuralcheck(cls, instance):
+        return cls._expand(instance, cls.__expand_is_instance)
+
     @classmethod
     def _repr(cls):
         try:
@@ -293,16 +283,14 @@ class Alt(metaclass=ABCMeta):
         
     @classmethod
     def _expand(cls, value, callback):
-        if hasattr(cls, '_abc_type_arguments'):
-            for (name, spec) in cls._abc_type_arguments:
-                try:
-                    return callback([(name, value, spec)])
-                except:
-                    pass
-            raise TypeError('No alternative in {0} for {1}'.format(
-                                            cls._abc_type_arguments, value))
-        else:
-            return callback.alternative([(None, value, None)])
+        def vsn():
+            if hasattr(cls, '_abc_type_arguments'):
+                for (name, spec) in cls._abc_type_arguments:
+                    yield (value, spec, name)
+            else:
+                yield (value, None, None)
+            raise TypeError('No alternative for {0}'.format(value))
+        return callback(vsn())
         
     @classmethod
     def _normalize(cls, callback):
@@ -312,6 +300,20 @@ class Alt(metaclass=ABCMeta):
         except AttributeError:
             return Alt
     
+    @staticmethod
+    def __expand_is_instance(vsn):
+        try:
+            for (v, s, _n) in vsn:
+                if isinstance(v, s):
+                    return True
+        except TypeError:
+            pass
+        return False
+
+    @classmethod
+    def _structuralcheck(cls, instance):
+        return cls._expand(instance, cls.__expand_is_instance)
+
     @classmethod
     def _repr(cls):
         try:
@@ -330,11 +332,11 @@ class Opt(Alt):
         if cls is Opt: # check args only when being used as a class factory
             if kargs or len(args) != 1:
                 raise TypeError('Opt requires a single, unnamed argument')
-            return _polymorphic_subclass(cls, none=None, value=args[0], 
+            return _polymorphic_subclass(cls, none=type(None), value=args[0], 
                                          _normalize=_normalize)
         else:
             return super(Opt, cls).__new__(cls, *args, **kargs)
-    
+            
     @classmethod
     def _repr(cls):
         try:
@@ -358,14 +360,31 @@ class _Cls:
 
                 @classmethod
                 def _expand(cls, value, callback):
-                    return callback.class_(cls._abc_class, value, 
-                                           cls._abc_type_arguments)
+                    def vsn():
+                        yield (value, cls._abc_class, None)
+                        for (name, spec) in cls._abc_type_arguments:
+                            yield (getattr(value, name), spec, name)
+                    return callback(vsn())
             
                 @classmethod
                 def _normalize(cls, callback):
                     (args, kargs) = _unhashable_types(cls._abc_type_arguments)
                     return Cls(cls._abc_class, *args, **kargs)
             
+                @staticmethod
+                def __expand_is_instance(vsn):
+                    try:
+                        for (v, s, _n) in vsn:
+                            if not isinstance(v, s):
+                                return False
+                        return True
+                    except TypeError:
+                        return False
+
+                @classmethod
+                def _structuralcheck(cls, instance):
+                    return cls._expand(instance, cls.__expand_is_instance)
+
                 @classmethod
                 def _repr(cls):
                     return 'Cls({0}{1}{2})'.format(
@@ -401,6 +420,36 @@ class Delayed():
         return self.__spec
     
     
+PYTYP_PATCHED = 'pytyp_patched'
+
+if not hasattr(ABCMeta, PYTYP_PATCHED):
+
+    instance_check = ABCMeta.__instancecheck__
+    def replacement_instancecheck(cls, instance):
+        try:
+            result = cls.__instancehook__(instance)
+#            if result is not NotImplemented:
+#                return result
+            if result: # if false may still be subclass
+                return result
+        except AttributeError:
+            pass
+        return instance_check(cls, instance)
+
+    ABCMeta.__instancecheck__ = replacement_instancecheck
+    setattr(ABCMeta, PYTYP_PATCHED, time())
+
+    for s in Sequence._abc_registry:
+        Seq.register(s)
+    for s in MutableSequence._abc_registry:
+        Seq.register(s)
+
+    for m in Mapping._abc_registry:
+        Map.register(m)
+    for m in MutableMapping._abc_registry:
+        Map.register(m)
+
+
 if __name__ == "__main__":
     import doctest
     print(doctest.testmod())

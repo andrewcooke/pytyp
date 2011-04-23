@@ -63,6 +63,7 @@ class SeqTest(TestCase):
         class Bar(list, Seq(int)): pass
         bar = Bar([1,2,3])
         assert isinstance(bar, Seq(int))
+        assert isinstance(bar, Seq)
         assert isinstance(bar, Sequence)
         assert isinstance(bar, list)
         assert bar[1:] == [2,3], bar[1:]
@@ -94,6 +95,9 @@ class SeqTest(TestCase):
         
     def test_structural(self):
         assert isinstance([1,2,3], Seq(int))
+        assert not isinstance(1, Seq(int))
+        assert not isinstance([1,'two'], Seq(int))
+        assert isinstance([1, None], Seq(Opt(int)))
         
         
 class MapTest(TestCase):
@@ -112,6 +116,20 @@ class MapTest(TestCase):
         Map(a=int, b=str).register_instance(baz)
         assert isinstance(baz, Map(a=int, b=str))
         
+    def test_structural(self):
+        assert isinstance({'a': 1}, Map(a=int))
+        assert not isinstance(1, Map(a=int))
+        assert not isinstance({'a': 1, 'b': 2}, Map(a=int))
+        assert not isinstance({'a': 'one'}, Map(a=int))
+        assert isinstance({'a': 1, 'b': 'two'}, Map(a=int,b=str))
+        try:
+            assert isinstance({'a': 1, 'b': 'two'}, {'a':int,'b':str})
+            assert False, 'Expected error'
+        except TypeError as e:
+            assert 'must be a type' in str(e), e
+        assert isinstance([1, 'two'], Map(int,str))
+        assert not isinstance([1, 2], Map(int,str))
+        
         
 class AltTest(TestCase):
     
@@ -127,6 +145,11 @@ class AltTest(TestCase):
         assert not isinstance(baz, Alt(int, str))
         Alt(int, str).register_instance(baz)
         assert isinstance(baz, Alt(int, str))
+
+    def test_structural(self):
+        assert isinstance('one', Alt(int, str))
+        assert isinstance(1, Alt(int, str))
+        assert not isinstance(1.0, Alt(int, str))
 
 
 class OptTest(TestCase):
@@ -150,6 +173,11 @@ class OptTest(TestCase):
         foo = normalize(Opt([int]))
         assert foo == Alt(none=None, value=Seq(int))
         
+    def test_structural(self):
+        assert isinstance(None, Opt(int))
+        assert isinstance(1, Opt(int))
+        assert not isinstance('one', Opt(int))
+        
         
 class ClsTest(TestCase):
     
@@ -168,6 +196,17 @@ class ClsTest(TestCase):
         assert isinstance(bar, Cls(Bar, int))
         assert not isinstance(baz, Cls(Bar, int))
         assert isinstance(baz, Cls(Baz, int))
+    
+    def test_structural(self):
+        class Foo:
+            def __init__(self, x):
+                self.x = x
+        ifoo = Foo(1)
+        sfoo = Foo('one')
+        assert isinstance(ifoo, Cls(Foo))
+        assert isinstance(sfoo, Cls(Foo))
+        assert isinstance(ifoo, Cls(Foo, x=int))
+        assert not isinstance(sfoo, Cls(Foo, x=int))
         
 
 

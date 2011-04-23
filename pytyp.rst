@@ -472,6 +472,11 @@ structural verification of each entry, is expensive for lists).  One
 resolution might be an extension to mutable containers that allow changes to
 be detected.
 
+Mutability
+..........
+
+setitem v hash.
+
 Extensibility
 .............
 
@@ -695,7 +700,8 @@ Conclusions
 
 Embedding — Solves many problems, but makes optimisation hard.
 
-
+Types are a formalization of the system.  They expose inconsistencies like the
+handling of mutable sequences (settitem v hash).
 
 define everything in terms of new abcs + use register.  make the abcs
 parametric.  are abcs transitive(sp?)

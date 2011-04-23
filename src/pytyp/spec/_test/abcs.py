@@ -3,7 +3,7 @@ from abc import ABCMeta
 from collections import Sequence
 from unittest import TestCase
 
-from pytyp.spec.abcs import Seq, Map, Alt, Opt, Cls, normalize, format
+from pytyp.spec.abcs import Seq, Map, Alt, Opt, Cls, normalize, Any
 
 
 class SeqTest(TestCase):
@@ -98,6 +98,7 @@ class SeqTest(TestCase):
         assert not isinstance(1, Seq(int))
         assert not isinstance([1,'two'], Seq(int))
         assert isinstance([1, None], Seq(Opt(int)))
+        assert isinstance([1, None, 'three'], Seq(Any))
         
         
 class MapTest(TestCase):
@@ -128,6 +129,8 @@ class MapTest(TestCase):
             assert False, 'Expected error'
         except TypeError as e:
             assert 'must be a type' in str(e), e
+        assert isinstance({'a': 1, 'b': 'two'}, Map(a=int,__b=str))
+        assert isinstance({'a': 1}, Map(a=int,__b=str))
         assert isinstance([1, 'two'], Map(int,str))
         assert not isinstance([1, 2], Map(int,str))
         

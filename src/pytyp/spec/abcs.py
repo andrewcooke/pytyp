@@ -17,32 +17,32 @@ Atomic.register(bool)
 
 def normalize(spec):
     '''
-    >>> format(normalize(Map(a=int)))
+    >>> fmt(normalize(Map(a=int)))
     'Map(a=int)'
-    >>> format(normalize({'a': int}))
+    >>> fmt(normalize({'a': int}))
     'Map(a=int)'
-    >>> format(normalize((int, str)))
+    >>> fmt(normalize((int, str)))
     'Map(0=int,1=str)'
-    >>> format(normalize(Map((int,), {'a':str})))
+    >>> fmt(normalize(Map((int,), {'a':str})))
     'Map(0=Map(0=int),1=Map(a=str))'
-    >>> format(normalize([int]))
+    >>> fmt(normalize([int]))
     'Seq(int)'
-    >>> format(normalize([]))
+    >>> fmt(normalize([]))
     'Seq'
-    >>> format(normalize(Seq([int])))
+    >>> fmt(normalize(Seq([int])))
     'Seq(Seq(int))'
-    >>> format(normalize(int))
+    >>> fmt(normalize(int))
     'int'
     >>> class Foo: pass
-    >>> format(normalize(Foo))
+    >>> fmt(normalize(Foo))
     'Cls(Foo)'
-    >>> format(normalize(Cls(Foo,int)))
+    >>> fmt(normalize(Cls(Foo,int)))
     'Cls(Foo,0=int)'
-    >>> format(normalize(Alt(int, str)))
+    >>> fmt(normalize(Alt(int, str)))
     'Alt(0=int,1=str)'
-    >>> format(normalize(Alt(int, Foo)))
+    >>> fmt(normalize(Alt(int, Foo)))
     'Alt(0=int,1=Cls(Foo))'
-    >>> format(normalize(Opt([int])))
+    >>> fmt(normalize(Opt([int])))
     'Opt(Seq(int))'
     '''
     if isinstance(spec, Delayed):
@@ -71,14 +71,14 @@ def normalize(spec):
             return spec # literal value (eg None)
 
 
-def format(spec):
+def fmt(spec):
     try:
-        return spec._repr()
+        return spec._fmt()
     except AttributeError:
         return spec.__name__
     
     
-def _hashable_types(*args, **kargs):
+def _hashable_types(args, kargs):
     types = dict((name, normalize(karg)) for (name, karg) in kargs.items())
     for (index, arg) in zip(count(), args):
         types[index] = normalize(arg)
@@ -90,11 +90,11 @@ def _unhashable_types(types):
             dict((name, spec) for (name, spec) in types if not isinstance(name, int)))
         
 
-def _polymorphic_subclass(abc, *args, _normalize=None, **kargs):
+def _polymorphic_subclass(abc, args, kargs, _normalize=None):
     if _normalize:
         args = tuple(_normalize(arg) for arg in args)
         kargs = dict((name, _normalize(karg)) for (name, karg) in kargs.items())
-    types = _hashable_types(*args, **kargs)
+    types = _hashable_types(args, kargs)
     if types not in abc._abc_polymorphic_cache:
         
         @classmethod
@@ -123,9 +123,6 @@ def _polymorphic_subclass(abc, *args, _normalize=None, **kargs):
                 
         abc._abc_polymorphic_cache[types] = subclass
     return abc._abc_polymorphic_cache[types]
-
-
-
 
 
 class Product:
@@ -168,7 +165,7 @@ class Seq(Sequence, Product):
         if cls is Seq: # check args only when being used as a class factory
             if kargs or len(args) != 1:
                 raise TypeError('Seq requires a single, unnamed argument')
-            return _polymorphic_subclass(cls, *args, _normalize=_normalize, **kargs)
+            return _polymorphic_subclass(cls, args, kargs, _normalize=_normalize)
         else:
             return super(Seq, cls).__new__(cls, *args, **kargs)
 
@@ -195,9 +192,9 @@ class Seq(Sequence, Product):
         return cls._expand(instance, cls._verify_contents)
             
     @classmethod
-    def _repr(cls):
+    def _fmt(cls):
         try:
-            return 'Seq({0})'.format(format(cls._abc_type_arguments[0][1]))
+            return 'Seq({0})'.format(fmt(cls._abc_type_arguments[0][1]))
         except AttributeError:
             return 'Seq'
 
@@ -218,11 +215,28 @@ class Map(Mapping, Product):
             else:
                 return name
 
+        @staticmethod            
+        def decode(name):
+            if name.startswith('__'):
+                return Map.OptKey(name[2:])
+            else:
+                return name
+        
+        def __eq__(self, other): return '__' + self.name == other
+        def __ne__(self, other): return '__' + self.name != other
+        def __le__(self, other): return '__' + self.name <= other
+        def __ge__(self, other): return '__' + self.name >= other
+        def __lt__(self, other): return '__' + self.name < other
+        def __gt__(self, other): return '__' + self.name > other
+        def __hash__(self): return hash('__' + self.name)
+        def __str__(self): return '__' + self.name
+
     def __new__(cls, *args, _normalize=normalize, **kargs):
         if cls is Map: # check args only when being used as a class factory
             if (kargs and args) or (not args and not kargs):
                 raise TypeError('Map requires named or unnamed arguments, but not both')
-            return _polymorphic_subclass(cls, *args, _normalize=_normalize, **kargs)
+            kargs = dict((Map.OptKey.decode(name), arg) for (name, arg) in kargs.items())
+            return _polymorphic_subclass(cls, args, kargs, _normalize=_normalize)
         else:
             return super(Map, cls).__new__(cls, *args, **kargs)
         
@@ -239,7 +253,7 @@ class Map(Mapping, Product):
                 for (name, spec) in cls._abc_type_arguments:
                     unpacked = Map.OptKey.unpack(name)
                     try:
-                        yield (value[unpacked], spec, unpacked) 
+                        yield (value[unpacked], spec, name)
                     except KeyError:
                         if not isinstance(name, Map.OptKey):
                             raise TypeError('Missing value for {0}'.format(name))
@@ -255,7 +269,10 @@ class Map(Mapping, Product):
     def _normalize(cls, callback):
         try:
             (args, kargs) = _unhashable_types(cls._abc_type_arguments)
-            return Map(*args, **kargs)
+            return Map(*(callback(arg) for arg in args),
+                       _normalize=callback,
+                       **dict((name, callback(arg))
+                              for (name, arg) in kargs.items()))
         except AttributeError:
             return Map
     
@@ -264,10 +281,10 @@ class Map(Mapping, Product):
         return cls._expand(instance, cls._verify_contents)
 
     @classmethod
-    def _repr(cls):
+    def _fmt(cls):
         try:
             return 'Map({0})'.format(
-                        ','.join('{0}={1}'.format(name, format(spec))
+                        ','.join('{0}={1}'.format(name, fmt(spec))
                                  for (name, spec) in cls._abc_type_arguments))
         except AttributeError:
             return 'Map'
@@ -285,7 +302,7 @@ class Alt(Sum, metaclass=ABCMeta):
         if cls is Alt: # check args only when being used as a class factory
             if (kargs and args) or (not args and not kargs):
                 raise TypeError('Alt requires named or unnamed arguments, but not both')
-            return _polymorphic_subclass(cls, *args, _normalize=_normalize, **kargs)
+            return _polymorphic_subclass(cls, args, kargs, _normalize=_normalize)
         else:
             return super(Alt, cls).__new__(cls, *args, **kargs)
         
@@ -304,7 +321,10 @@ class Alt(Sum, metaclass=ABCMeta):
     def _normalize(cls, callback):
         try:
             (args, kargs) = _unhashable_types(cls._abc_type_arguments)
-            return Alt(*args, **kargs)
+            return Alt(*(callback(arg) for arg in args), 
+                       _normalize=callback,
+                       **dict((name, callback(arg))
+                              for (name, arg) in kargs.items()))
         except AttributeError:
             return Alt
     
@@ -313,10 +333,10 @@ class Alt(Sum, metaclass=ABCMeta):
         return cls._expand(instance, cls._verify_contents)
 
     @classmethod
-    def _repr(cls):
+    def _fmt(cls):
         try:
             return 'Alt({0})'.format(
-                        ','.join('{0}={1}'.format(name, format(spec))
+                        ','.join('{0}={1}'.format(name, fmt(spec))
                                  for (name, spec) in cls._abc_type_arguments))
         except AttributeError:
             return 'Alt'
@@ -328,15 +348,15 @@ class Opt(Alt):
         if cls is Opt: # check args only when being used as a class factory
             if kargs or len(args) != 1:
                 raise TypeError('Opt requires a single, unnamed argument')
-            return _polymorphic_subclass(cls, none=type(None), value=args[0], 
+            return _polymorphic_subclass(cls, (), {'none':type(None), 'value':args[0]}, 
                                          _normalize=_normalize)
         else:
             return super(Opt, cls).__new__(cls, *args, **kargs)
             
     @classmethod
-    def _repr(cls):
+    def _fmt(cls):
         try:
-            return 'Opt({0})'.format(format(cls._abc_type_arguments[1][1]))
+            return 'Opt({0})'.format(fmt(cls._abc_type_arguments[1][1]))
         except AttributeError:
             return 'Opt'
     
@@ -361,31 +381,35 @@ class _Cls:
                         for (name, spec) in cls._abc_type_arguments:
                             yield (getattr(value, name), spec, name)
                     return callback(vsn())
-            
+
                 @classmethod
                 def _normalize(cls, callback):
                     (args, kargs) = _unhashable_types(cls._abc_type_arguments)
-                    return Cls(cls._abc_class, *args, **kargs)
-            
+                    return Cls(cls._abc_class, 
+                               *(callback(arg) for arg in args), 
+                               _normalize=callback,
+                               **dict((name, callback(arg))
+                                      for (name, arg) in kargs.items()))
+
                 @classmethod
                 def _structuralcheck(cls, instance):
                     return cls._expand(instance, cls._verify_contents)
 
                 @classmethod
-                def _repr(cls):
+                def _fmt(cls):
                     return 'Cls({0}{1}{2})'.format(
                                 cls._abc_class.__name__, 
                                ',' if cls._abc_type_arguments else '',
-                               ','.join('{0}={1}'.format(name, format(spec))
+                               ','.join('{0}={1}'.format(name, fmt(spec))
                                         for (name, spec) in cls._abc_type_arguments))
         
             self._abc_class_cache[class_] = __Cls
-        return _polymorphic_subclass(self._abc_class_cache[class_], *args, 
-                                    _normalize=_normalize, **kargs)
+        return _polymorphic_subclass(self._abc_class_cache[class_], args, kargs,
+                                    _normalize=_normalize)
     
 Cls = _Cls()
 
-Any = Cls(type)
+Any = Cls(object)
 
 
 class Delayed():

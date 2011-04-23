@@ -414,8 +414,6 @@ if not hasattr(ABCMeta, PYTYP_PATCHED):
     def replacement_instancecheck(cls, instance):
         try:
             result = cls.__instancehook__(instance)
-#            if result is not NotImplemented:
-#                return result
             if result: # if false may still be subclass
                 return result
         except AttributeError:
@@ -425,13 +423,8 @@ if not hasattr(ABCMeta, PYTYP_PATCHED):
     ABCMeta.__instancecheck__ = replacement_instancecheck
     setattr(ABCMeta, PYTYP_PATCHED, time())
 
-    for s in Sequence._abc_registry:
-        Seq.register(s)
     for s in MutableSequence._abc_registry:
         Seq.register(s)
-
-    for m in Mapping._abc_registry:
-        Map.register(m)
     for m in MutableMapping._abc_registry:
         Map.register(m)
 

@@ -108,6 +108,7 @@ class MapTest(TestCase):
         assert bar['a'] == 1
         assert isinstance(bar, Map(a=int, b=str))
         assert not isinstance(bar, Map(a=int, b=int))
+        assert isinstance({}, Map)
         
     def test_register(self):
         class Baz(): pass

@@ -7,7 +7,13 @@ from time import time
 from weakref import WeakSet, WeakKeyDictionary
 
 
-ATOMIC = {Number, ByteString, str}
+class Atomic(metaclass=ABCMeta): pass
+
+Atomic.register(Number)
+Atomic.register(ByteString)
+Atomic.register(str)
+Atomic.register(bool)
+
 
 def normalize(spec):
     '''
@@ -54,10 +60,8 @@ def normalize(spec):
         return Map(**dict((name, normalize(spec[name])) for name in spec))
     elif isinstance(spec, tuple):
         return Map(*tuple(normalize(s) for s in spec))
-    elif isinstance(spec, type):
-        for type_ in ATOMIC:
-            if issubclass(spec, type_):
-                return spec
+    elif isinstance(spec, type) and issubclass(spec, Atomic):
+        return spec
     try:
         return spec._normalize(normalize)
     except AttributeError:
@@ -121,7 +125,42 @@ def _polymorphic_subclass(abc, *args, _normalize=None, **kargs):
     return abc._abc_polymorphic_cache[types]
 
 
-class Seq(Sequence):
+
+
+
+class Product:
+    
+    @staticmethod
+    def _verify_contents(vsn):
+        try:
+#            from functools import reduce
+#            from operator import __and__
+#            return reduce(__and__, map(lambda x: isinstance(x[0], x[1]), vsn), True)
+            for (v, s, _n) in vsn:
+                if not isinstance(v, s):
+                    return False
+            return True
+        except TypeError:
+            return False
+    
+
+class Sum:
+    
+    @staticmethod
+    def _verify_contents(vsn):
+        try:
+#            from functools import reduce
+#            from operator import __or__
+#            return reduce(__or__, map(lambda x: isinstance(x[0], x[1]), vsn), False)
+            for (v, s, _n) in vsn:
+                if isinstance(v, s):
+                    return True
+            return False
+        except TypeError:
+            return False
+
+
+class Seq(Sequence, Product):
     
     _abc_polymorphic_cache = {}
     
@@ -133,12 +172,6 @@ class Seq(Sequence):
         else:
             return super(Seq, cls).__new__(cls, *args, **kargs)
 
-    @classmethod
-    def __subclasshook__(cls, subclass):
-        #return Sequence.__subclasscheck__(subclass)
-        #return issubclass(subclass, Sequence)
-        return NotImplemented
-        
     @classmethod
     def _expand(cls, instance, callback):
         def vsn():
@@ -157,19 +190,9 @@ class Seq(Sequence):
         except AttributeError:
             return Seq
         
-    @staticmethod
-    def __expand_is_instance(vsn):
-        try:
-            for (v, s, _n) in vsn:
-                if not isinstance(v, s):
-                    return False
-            return True
-        except TypeError:
-            return False
-        
     @classmethod
     def _structuralcheck(cls, instance):
-        return cls._expand(instance, cls.__expand_is_instance)
+        return cls._expand(instance, cls._verify_contents)
             
     @classmethod
     def _repr(cls):
@@ -179,7 +202,7 @@ class Seq(Sequence):
             return 'Seq'
 
 
-class Map(Mapping):
+class Map(Mapping, Product):
     
     _abc_polymorphic_cache = {}
     
@@ -202,11 +225,6 @@ class Map(Mapping):
             return _polymorphic_subclass(cls, *args, _normalize=_normalize, **kargs)
         else:
             return super(Map, cls).__new__(cls, *args, **kargs)
-        
-    @classmethod
-    def __subclasshook__(cls, subclass):
-        #return Mapping.__subclasscheck__(subclass)
-        return NotImplemented
         
     @classmethod
     def _expand(cls, value, callback):
@@ -241,19 +259,9 @@ class Map(Mapping):
         except AttributeError:
             return Map
     
-    @staticmethod
-    def __expand_is_instance(vsn):
-        try:
-            for (v, s, _n) in vsn:
-                if not isinstance(v, s):
-                    return False
-            return True
-        except TypeError:
-            return False
-
     @classmethod
     def _structuralcheck(cls, instance):
-        return cls._expand(instance, cls.__expand_is_instance)
+        return cls._expand(instance, cls._verify_contents)
 
     @classmethod
     def _repr(cls):
@@ -265,7 +273,7 @@ class Map(Mapping):
             return 'Map'
 
 
-class Alt(metaclass=ABCMeta):
+class Alt(Sum, metaclass=ABCMeta):
     
     # this makes no sense as a mixin - it exists only to specialise the 
     # functionality provided by the Polymorphic factory above (ie to hold 
@@ -300,19 +308,9 @@ class Alt(metaclass=ABCMeta):
         except AttributeError:
             return Alt
     
-    @staticmethod
-    def __expand_is_instance(vsn):
-        try:
-            for (v, s, _n) in vsn:
-                if isinstance(v, s):
-                    return True
-        except TypeError:
-            pass
-        return False
-
     @classmethod
     def _structuralcheck(cls, instance):
-        return cls._expand(instance, cls.__expand_is_instance)
+        return cls._expand(instance, cls._verify_contents)
 
     @classmethod
     def _repr(cls):
@@ -325,8 +323,6 @@ class Alt(metaclass=ABCMeta):
 
 
 class Opt(Alt):
-    
-    # a specialised Alt - this works because the cache is on Alt
     
     def __new__(cls, *args, _normalize=normalize, **kargs):
         if cls is Opt: # check args only when being used as a class factory
@@ -353,7 +349,7 @@ class _Cls:
     def __call__(self, class_, *args, _normalize=normalize, **kargs):
         if class_ not in self._abc_class_cache:
 
-            class __Cls(metaclass=ABCMeta):
+            class __Cls(Product, metaclass=ABCMeta):
                 
                 _abc_polymorphic_cache = {}
                 _abc_class = class_
@@ -371,19 +367,9 @@ class _Cls:
                     (args, kargs) = _unhashable_types(cls._abc_type_arguments)
                     return Cls(cls._abc_class, *args, **kargs)
             
-                @staticmethod
-                def __expand_is_instance(vsn):
-                    try:
-                        for (v, s, _n) in vsn:
-                            if not isinstance(v, s):
-                                return False
-                        return True
-                    except TypeError:
-                        return False
-
                 @classmethod
                 def _structuralcheck(cls, instance):
-                    return cls._expand(instance, cls.__expand_is_instance)
+                    return cls._expand(instance, cls._verify_contents)
 
                 @classmethod
                 def _repr(cls):

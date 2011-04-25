@@ -1,7 +1,7 @@
 
 from unittest import TestCase
 
-from pytyp.spec.base import *
+from pytyp.spec.abcs import *
 
 
 class NormalizeTest(TestCase):
@@ -12,6 +12,6 @@ class NormalizeTest(TestCase):
     
     def test_delayed(self):
         d = Delayed()
-        d += int
-        self.assert_normal(d, Cls(int))
+        d.set(int)
+        self.assert_normal(d, d)
         

@@ -2,7 +2,7 @@
 
 from pytyp.spec.check import verify
 from pytyp.util import items
-from pytyp.spec.base import Any
+from pytyp.spec.abcs import Any
 
 
 class TypedValue:

@@ -1,8 +1,10 @@
 
 from abc import ABCMeta
 from collections import Sequence, Mapping, ByteString, MutableSequence, MutableMapping
+from functools import wraps
 from itertools import count
 from numbers import Number
+from reprlib import recursive_repr, get_ident
 from time import time
 from weakref import WeakSet, WeakKeyDictionary
 
@@ -15,6 +17,44 @@ Atomic.register(str)
 Atomic.register(bool)
 
 
+class Normalized(metaclass=ABCMeta): pass
+
+
+class RecursiveType(TypeError):
+    
+    @staticmethod
+    def throw(_): raise RecursiveType
+
+
+def make_recursive_block(make_key=lambda args: id(args[0]), 
+                            on_recursion=lambda x: x):
+
+    def recursive_block(function):
+    
+        running = set()
+    
+        @wraps(function)
+        def wrapper(*args):
+            subkey = make_key(args)
+            key = (subkey, get_ident())
+            if key in running:
+                return on_recursion(subkey)
+            running.add(key)
+            try:
+                result = function(*args)
+            finally:
+                running.discard(key)
+            return result
+        return wrapper
+    
+    return recursive_block
+
+
+block_instancehook = make_recursive_block(lambda args: (id(args[0]), id(args[1])), 
+                                           lambda _: False)
+
+
+@make_recursive_block()
 def normalize(spec):
     '''
     >>> fmt(normalize(Map(a=int)))
@@ -44,38 +84,46 @@ def normalize(spec):
     'Alt(0=int,1=Cls(Foo))'
     >>> fmt(normalize(Opt([int])))
     'Opt(Seq(int))'
+    >>> fmt([int, str])
+    'Map(0=int,1=str)'
     '''
-    if isinstance(spec, Delayed):
-        spec = spec.spec
-    if spec is None:
-        spec = type(None)
-    elif isinstance(spec, list):
+    if isinstance(spec, list):
+        if not spec:
+            return Seq
         if len(spec) == 1:
             return Seq(normalize(spec[0]))
-        elif len(spec) == 0:
-            return Seq
         else:
-            raise TypeError('List specification should contain at most one value: {0}'.format(spec))
+            return Map(*map(normalize, spec))
     elif isinstance(spec, dict):
-        return Map(**dict((name, normalize(spec[name])) for name in spec))
+        return Map(_dict=dict((name, normalize(spec[name])) for name in spec))
     elif isinstance(spec, tuple):
         return Map(*tuple(normalize(s) for s in spec))
-    elif isinstance(spec, type) and issubclass(spec, Atomic):
-        return spec
-    try:
-        return spec._normalize(normalize)
-    except AttributeError:
-        if isinstance(spec, type):
-            return Cls(spec)
+    elif isinstance(spec, type):
+        if issubclass(spec, Delayed):
+            spec._spec = normalize(spec._spec)
+            return spec
+        elif issubclass(spec, Atomic):
+            return spec
+        elif issubclass(spec, Normalized):
+            return spec
         else:
-            return spec # literal value (eg None)
+            return Cls(spec)
+    else:
+        return normalize(type(spec))
 
 
 def fmt(spec):
     try:
-        return spec._fmt()
+        return normalize(spec)._fmt()
     except AttributeError:
-        return spec.__name__
+        try:
+            return spec.__name__
+        except AttributeError:
+            return repr(spec) # only on bad type
+    
+    
+def expand(value, spec, callback):
+    return normalize(spec)._expand(value, callback)
     
     
 def _hashable_types(args, kargs):
@@ -104,6 +152,7 @@ def _polymorphic_subclass(abc, args, kargs, _normalize=None):
             cls._abc_instance_registry.add(instance)
             
         @classmethod
+        @block_instancehook
         def __instancehook__(cls, instance):
             try:
                 if instance in cls._abc_instance_registry:
@@ -157,7 +206,7 @@ class Sum:
             return False
 
 
-class Seq(Sequence, Product):
+class Seq(Sequence, Product, Normalized):
     
     _abc_polymorphic_cache = {}
     
@@ -170,23 +219,16 @@ class Seq(Sequence, Product):
             return super(Seq, cls).__new__(cls, *args, **kargs)
 
     @classmethod
-    def _expand(cls, instance, callback):
+    def _expand(cls, value, callback):
         def vsn():
             try:
                 (name, spec) = cls._abc_type_arguments[0]
             except AttributeError:
                 (name, spec) = (None, None)
-            for value in instance:
-                yield (value, spec, name)
+            for v in value:
+                yield (v, spec, name)
         return callback(vsn())
             
-    @classmethod
-    def _normalize(cls, callback):
-        try:
-            return Seq(callback(cls._abc_type_arguments[0][1]), _normalize=callback)
-        except AttributeError:
-            return Seq
-        
     @classmethod
     def _structuralcheck(cls, instance):
         return cls._expand(instance, cls._verify_contents)
@@ -199,7 +241,7 @@ class Seq(Sequence, Product):
             return 'Seq'
 
 
-class Map(Mapping, Product):
+class Map(Mapping, Product, Normalized):
     
     _abc_polymorphic_cache = {}
     
@@ -217,10 +259,12 @@ class Map(Mapping, Product):
 
         @staticmethod            
         def decode(name):
-            if name.startswith('__'):
-                return Map.OptKey(name[2:])
-            else:
-                return name
+            try:
+                if name.startswith('__'):
+                    return Map.OptKey(name[2:])
+            except AttributeError:
+                pass
+            return name
         
         def __eq__(self, other): return '__' + self.name == other
         def __ne__(self, other): return '__' + self.name != other
@@ -231,8 +275,9 @@ class Map(Mapping, Product):
         def __hash__(self): return hash('__' + self.name)
         def __str__(self): return '__' + self.name
 
-    def __new__(cls, *args, _normalize=normalize, **kargs):
+    def __new__(cls, *args, _normalize=normalize, _dict=None, **kargs):
         if cls is Map: # check args only when being used as a class factory
+            if _dict: kargs.update(_dict) 
             if (kargs and args) or (not args and not kargs):
                 raise TypeError('Map requires named or unnamed arguments, but not both')
             kargs = dict((Map.OptKey.decode(name), arg) for (name, arg) in kargs.items())
@@ -266,17 +311,6 @@ class Map(Mapping, Product):
         return callback(vsn())
         
     @classmethod
-    def _normalize(cls, callback):
-        try:
-            (args, kargs) = _unhashable_types(cls._abc_type_arguments)
-            return Map(*(callback(arg) for arg in args),
-                       _normalize=callback,
-                       **dict((name, callback(arg))
-                              for (name, arg) in kargs.items()))
-        except AttributeError:
-            return Map
-    
-    @classmethod
     def _structuralcheck(cls, instance):
         return cls._expand(instance, cls._verify_contents)
 
@@ -290,7 +324,7 @@ class Map(Mapping, Product):
             return 'Map'
 
 
-class Alt(Sum, metaclass=ABCMeta):
+class Alt(Sum, Normalized, metaclass=ABCMeta):
     
     # this makes no sense as a mixin - it exists only to specialise the 
     # functionality provided by the Polymorphic factory above (ie to hold 
@@ -318,17 +352,6 @@ class Alt(Sum, metaclass=ABCMeta):
         return callback(vsn())
         
     @classmethod
-    def _normalize(cls, callback):
-        try:
-            (args, kargs) = _unhashable_types(cls._abc_type_arguments)
-            return Alt(*(callback(arg) for arg in args), 
-                       _normalize=callback,
-                       **dict((name, callback(arg))
-                              for (name, arg) in kargs.items()))
-        except AttributeError:
-            return Alt
-    
-    @classmethod
     def _structuralcheck(cls, instance):
         return cls._expand(instance, cls._verify_contents)
 
@@ -341,8 +364,19 @@ class Alt(Sum, metaclass=ABCMeta):
         except AttributeError:
             return 'Alt'
 
+    @classmethod
+    def _on(cls, value, **choices):
+        for choice in choices:
+            for (name, spec) in cls._abc_type_arguments:
+                if choice == name and isinstance(value, spec):
+                    return choices[choice](value)
+        raise TypeError('Cannot dispatch {0} on {1}'.format(value, fmt(self)))
+
 
 class Opt(Alt):
+    
+    # defining this as a subclass of Alt, rather than simple function that calls
+    # Alt just gives a nicer formatting
     
     def __new__(cls, *args, _normalize=normalize, **kargs):
         if cls is Opt: # check args only when being used as a class factory
@@ -369,7 +403,7 @@ class _Cls:
     def __call__(self, class_, *args, _normalize=normalize, **kargs):
         if class_ not in self._abc_class_cache:
 
-            class __Cls(Product, metaclass=ABCMeta):
+            class __Cls(Product, Normalized, metaclass=ABCMeta):
                 
                 _abc_polymorphic_cache = {}
                 _abc_class = class_
@@ -381,15 +415,6 @@ class _Cls:
                         for (name, spec) in cls._abc_type_arguments:
                             yield (getattr(value, name), spec, name)
                     return callback(vsn())
-
-                @classmethod
-                def _normalize(cls, callback):
-                    (args, kargs) = _unhashable_types(cls._abc_type_arguments)
-                    return Cls(cls._abc_class, 
-                               *(callback(arg) for arg in args), 
-                               _normalize=callback,
-                               **dict((name, callback(arg))
-                                      for (name, arg) in kargs.items()))
 
                 @classmethod
                 def _structuralcheck(cls, instance):
@@ -412,22 +437,58 @@ Cls = _Cls()
 Any = Cls(object)
 
 
-class Delayed():
+class Delayed(metaclass=ABCMeta):
     
-    def __init__(self):
-        self.__spec = None
-        self.__defined = False
+    _count = 0
+    
+    def __new__(cls, *args, _normalize=normalize, **kargs):
+        cls._count += 1
+        return type(cls.__name__ + '_' + str(cls._count),
+                    (cls,),
+                    {'_spec': None,
+                     '_defined': False})
+    
+    @classmethod
+    def set(cls, spec):
+        assert not cls._defined, 'Delayed already defined'
+        cls._spec = spec
+        cls._defined = True
+        return cls
+    
+    @classmethod
+    def get(cls):
+        assert cls._defined, 'Delayed not defined'
+        return cls._spec
+    
+    @classmethod
+    def register(cls, subclass):
+        return cls.get().register(subclass)
         
-    def __iadd__(self, spec):
-        assert not self.__defined, 'Delayed already defined'
-        self.__spec = spec
-        self.__defined = True
-        return self
+    @classmethod
+    def register_instance(cls, instance):
+        return cls.get().register_instance(instance)
         
-    @property
-    def spec(self):
-        assert self.__defined, 'Delayed type not defined'
-        return self.__spec
+    @classmethod
+    @block_instancehook
+    def __instancehook__(cls, instance):
+        return cls.get().__instancehook__(instance)
+        
+    @classmethod
+    def _expand(cls, value, callback):
+        return cls.get()._expand(value, callback)
+                    
+    @classmethod
+    def _structuralcheck(cls, instance):
+        return cls.get()._structuralcheck(instance)
+
+    @classmethod
+    @recursive_repr()
+    def _fmt(cls):
+        return 'Delayed({0})'.format(fmt(cls.get()))
+    
+    @classmethod
+    def _on(cls, value, **choices):
+        return cls.get()._on(value, **choices)
     
     
 PYTYP_PATCHED = 'pytyp_patched'

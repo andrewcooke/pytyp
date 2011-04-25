@@ -3,7 +3,8 @@ from abc import ABCMeta
 from collections import Sequence
 from unittest import TestCase
 
-from pytyp.spec.abcs import Seq, Map, Alt, Opt, Cls, normalize, Any
+from pytyp.spec.abcs import Seq, Map, Alt, Opt, Cls, normalize, Any, Delayed,\
+    fmt
 
 
 class SeqTest(TestCase):
@@ -99,6 +100,14 @@ class SeqTest(TestCase):
         assert not isinstance([1,'two'], Seq(int))
         assert isinstance([1, None], Seq(Opt(int)))
         assert isinstance([1, None, 'three'], Seq(Any))
+        
+    def test_loop(self):
+        d = Delayed()
+        d2 = Alt(int, d, str)
+        d.set(d2)
+        assert fmt(d) == 'Delayed(Alt(0=int,1=...,2=str))', fmt(d)
+        assert isinstance(1, d)
+        assert isinstance('two', d)
         
         
 class MapTest(TestCase):
@@ -211,6 +220,3 @@ class ClsTest(TestCase):
         assert isinstance(sfoo, Cls(Foo))
         assert isinstance(ifoo, Cls(Foo, x=int))
         assert not isinstance(sfoo, Cls(Foo, x=int))
-        
-
-

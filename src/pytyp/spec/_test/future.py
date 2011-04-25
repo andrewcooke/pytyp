@@ -1,7 +1,7 @@
 
 from unittest import TestCase
 
-from pytyp.spec.base import Delayed, Alt
+from pytyp.spec.abcs import Delayed, Alt
 from pytyp.spec.future import TypedProperty, Typed
 from pytyp.spec.check import checked
 
@@ -74,17 +74,17 @@ def tree_functor_2(leaf_type):
         
         @staticmethod
         def size(value, spec):
-            return spec.on(value,
-                           none=lambda _: 0,
-                           leaf=lambda l: 1,
-                           node=lambda n: len(n))
+            return spec._on(value,
+                            none=lambda _: 0,
+                            leaf=lambda l: 1,
+                            node=lambda n: len(n))
             
         @staticmethod
         def set_add(value, spec, leaf:leaf_type):
-            return spec.on(value,
-                           none=lambda _: leaf,
-                           leaf=lambda l: Node(l).add(leaf),
-                           node=lambda n: n.add(leaf))
+            return spec._on(value,
+                            none=lambda _: leaf,
+                            leaf=lambda l: Node(l).add(leaf),
+                            node=lambda n: n.add(leaf))
 
 
     class Node(Typed):
@@ -121,7 +121,7 @@ def tree_functor_2(leaf_type):
             return self.p.root.size()
 
             
-    tree_type += Alt(none=None, leaf=leaf_type, node=Node)
+    tree_type.set(Alt(none=None, leaf=leaf_type, node=Node))
        
     return Tree
 

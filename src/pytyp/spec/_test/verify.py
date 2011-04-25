@@ -29,7 +29,7 @@
 from unittest import TestCase
 from collections import namedtuple
 
-from pytyp.spec.base import Opt, Alt, Any, Map
+from pytyp.spec.abcs import Opt, Alt, Any, Map
 from pytyp.spec.check import verify
 from pytyp._test.support import SimpleArgs
 
@@ -60,13 +60,12 @@ class verifyTest(TestCase):
         self.assert_error(lambda:verify(SimpleArgs, 'a'))
     
     def test_polymorphic(self):
-        verify('a', ...)
-        verify('a', Any())
-        verify(1, Any())
-        verify([1,2], Any())
-        verify({1:2}, Any())
-        verify(object(), Any())
-        verify(SimpleArgs(1,2,3), Any())
+        verify('a', Any)
+        verify(1, Any)
+        verify([1,2], Any)
+        verify({1:2}, Any)
+        verify(object(), Any)
+        verify(SimpleArgs(1,2,3), Any)
     
     def test_maybe(self):
         verify(None, Opt(str))
@@ -83,11 +82,11 @@ class verifyTest(TestCase):
         verify([1,2,3], [int])
         verify([], [int])
         verify([1,None,3], [Opt(int)])
-        verify([1,2,3], Any())
-        verify([1,2,3], [Any()])
+        verify([1,2,3], Any)
+        verify([1,2,3], [Any])
         self.assert_error(lambda: verify([1,'two',3], [int]))
-        self.assert_error(lambda: verify([1,2,3], []))
-        self.assert_error(lambda: verify([1,'two'], [int,str]))
+        verify([1,2,3], [])
+        verify([1,'two'], [int,str])
         
     def test_sequence_as_tuple(self):
         verify([1], (int,))

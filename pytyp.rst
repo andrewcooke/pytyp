@@ -340,8 +340,7 @@ runtime context).
 Providing a semantics for these type specifications, particularly one related
 to existing features, is more complex.  In particular, adding type annotations
 to ABCs faces significant problems.  First, it is incomplete: attributes and
-generators do not support annotations, and scope issues complicate some common
-uses.  Second, dependent types would be needed to handle ``dict``.  Third, it
+generators do not support annotations.  Second, dependent types would be needed to handle ``dict``.  Third, it
 is verbose, particularly when using the standard container classes, which must
 to be subclassed for every distinct use, but also because it ignores
 correlations between the types of different attributes.
@@ -517,20 +516,6 @@ syntax that resembles type-parameterised ABCs (see below).
 
 .. [#] http://mail.python.org/pipermail/python-3000/2006-May/002104.html
 
-Type Annotation Scope
-.....................
-
-Some type annotations are impossible due to scoping rules.  For example::
-
-  >>> class Example:
-  ...     def method(self, other:Example):
-  ...         pass
-  NameError: name 'Example' is not defined
-
-SQLAlchemy solves this kind of problem by allowing type names to be strings,
-which are later expanded.  I can also imagine situations in which ``self``
-would be a useful return type.
-
 ABC Properties
 ..............
 
@@ -670,7 +655,7 @@ subclass of ``type``::
 
     >>> isinstance([1,2,3], normalize([int]))
     True
-    >>> ininstance([{'a':1, 'b':'two'}], Seq({'a':int, 'b':str})]
+    >>> isinstance([{'a':1, 'b':'two'}], Seq({'a':int, 'b':str}))
     True
 
 The mapping from natural to formal types is flexible, respecting duck typing
@@ -694,7 +679,7 @@ values make certain names optional)::
 
     >>> isinstance({'a':1}, Map(a=int, __b=str))
     True
-    >>> isinstance({'a':1, b:'two'}, Map(a=int, __b=str))
+    >>> isinstance({'a':1, 'b':'two'}, Map(a=int, __b=str))
     True
 
 .. [#] It's hard to find something that is readable, an aceptable parameter
@@ -732,7 +717,10 @@ Structural typing of classes uses attribute names::
 Circular References
 ...................
 
-TODO
+    >>> d = Delayed()
+    >>> d.set(Alt(int, d, str))
+    >>> fmt(d)
+    'Delayed(Alt(0=int,1=...,2=str))'
 
 Dispatch by Type
 ................
@@ -740,7 +728,7 @@ Dispatch by Type
 It's hard to find a convincing example for this [#]_, but since it is easy to
 implement::
 
-    >>> Any(a=int, b=str)._on(42,
+    >>> Alt(a=int, b=str)._on(42,
     ...                       a=lambda _: 'an integer',
     ...                       b=lambda _: 'a string')
     'an integer'

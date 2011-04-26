@@ -19,6 +19,9 @@ Atomic.register(bool)
 
 class Normalized(metaclass=ABCMeta): pass
     # must be applied directly!
+    
+class Registered(metaclass=ABCMeta): pass
+
 
 class RecursiveType(TypeError):
     
@@ -164,12 +167,15 @@ def _polymorphic_subclass(abc, args, kargs, _normalize=None):
                     return True
             except TypeError: # unhashable
                 pass
-            return cls._structuralcheck(instance)
+            # only do structural check for classes that are not already registered
+            # or we get confusing results with empty containers (and slower code)
+            if not isinstance(instance, Registered):
+                return cls._structuralcheck(instance)
                 
         # replaced a standard class definition with this to help with debugging
         # as it was confusing when everything had the same name
         subclass = type(abc)(abc.__name__ + '_' + str(hash(types)),
-                             (abc, Normalized),
+                             (abc, Normalized, Registered),
                              {'_abc_type_arguments': types,
                               '_abc_instance_registry': WeakSet(),
                               'register_instance': register_instance,
@@ -268,14 +274,15 @@ class Map(Mapping, Product, Normalized):
                 pass
             return name
         
-        def __eq__(self, other): return '__' + self.name == other
-        def __ne__(self, other): return '__' + self.name != other
-        def __le__(self, other): return '__' + self.name <= other
-        def __ge__(self, other): return '__' + self.name >= other
-        def __lt__(self, other): return '__' + self.name < other
-        def __gt__(self, other): return '__' + self.name > other
-        def __hash__(self): return hash('__' + self.name)
-        def __str__(self): return '__' + self.name
+        # these are used only for dicts of program arguments
+        def __eq__(self, other): return str(self) == str(other)
+        def __ne__(self, other): return str(self) != str(other)
+        def __le__(self, other): return str(self) <= str(other)
+        def __ge__(self, other): return str(self) >= str(other)
+        def __lt__(self, other): return str(self) < str(other)
+        def __gt__(self, other): return str(self) > str(other)
+        def __hash__(self): return hash(str(self))
+        def __str__(self): return '__' +  str(self.name)
 
     def __new__(cls, *args, _normalize=normalize, _dict=None, **kargs):
         if cls is Map: # check args only when being used as a class factory
@@ -461,7 +468,6 @@ class Delayed(metaclass=ABCMeta):
         assert not cls._defined, 'Delayed already defined'
         cls._spec = spec
         cls._defined = True
-        return cls
     
     @classmethod
     def get(cls):

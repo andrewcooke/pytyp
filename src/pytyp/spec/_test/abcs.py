@@ -111,9 +111,10 @@ class SeqTest(TestCase):
         
     def test_untyped(self):
         class MyIntSequence(list, Seq(int)): pass
-        assert isinstance(MyIntSequence(), Seq(int))
-        assert not isinstance(MyIntSequence(), Seq(float))
-        assert not isinstance(MyIntSequence(), Seq)
+        ilist = MyIntSequence()
+        assert isinstance(ilist, Seq(int))
+        assert not isinstance(ilist, Seq(float))
+        assert isinstance(ilist, Seq)
         
         
 class MapTest(TestCase):

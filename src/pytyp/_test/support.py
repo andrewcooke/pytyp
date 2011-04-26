@@ -25,6 +25,7 @@
 # required by the LGPL License.  If you do not delete the provisions
 # above, a recipient may use your version of this file under either the
 # MPL or the LGPL License.
+from reprlib import recursive_repr
 
 '''
 Support classes for tests.
@@ -50,12 +51,20 @@ class SimpleArgs(AttributeEquality):
         self.b = b
         self.c = c
         
+    @recursive_repr()
+    def __repr__(self):
+        return 'SimpleArgs({0},{1},{2})'.format(self.a, self.b, self.c)
+        
 
 class NamedArgs(AttributeEquality):
     
     def __init__(self, p=None, q=None):
         self.p = p
         self.q = q
+
+    @recursive_repr()
+    def __repr__(self):
+        return 'NamedArgs(p={0},q={1})'.format(self.p, self.q)
         
         
 class MixedArgs(AttributeEquality):
@@ -77,6 +86,10 @@ class ArgsAndKArgs(AttributeEquality):
     def __init__(self, *simples:[SimpleArgs], **untyped):
         self.simples = simples
         self.untyped = untyped
+        
+    @recursive_repr()
+    def __repr__(self):
+        return 'ArgsAndKArgs(*simples={0},**untyped={1})'.format(self.simples, self.untyped)
         
 
 class MissingKArgs(AttributeEquality):

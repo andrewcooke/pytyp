@@ -109,6 +109,12 @@ class SeqTest(TestCase):
         assert isinstance(1, d)
         assert isinstance('two', d)
         
+    def test_untyped(self):
+        class MyIntSequence(list, Seq(int)): pass
+        assert isinstance(MyIntSequence(), Seq(int))
+        assert not isinstance(MyIntSequence(), Seq(float))
+        assert not isinstance(MyIntSequence(), Seq)
+        
         
 class MapTest(TestCase):
     
@@ -184,7 +190,7 @@ class OptTest(TestCase):
         
     def test_normalize(self):
         foo = normalize(Opt([int]))
-        assert foo == Alt(none=None, value=Seq(int))
+        assert foo == Alt(none=None, value=Seq(int)), fmt(foo)
         
     def test_structural(self):
         assert isinstance(None, Opt(int))
@@ -220,3 +226,13 @@ class ClsTest(TestCase):
         assert isinstance(sfoo, Cls(Foo))
         assert isinstance(ifoo, Cls(Foo, x=int))
         assert not isinstance(sfoo, Cls(Foo, x=int))
+
+    def test_inheritance(self):
+        assert issubclass(Cls(int), Cls)
+        
+        
+class AnyTest(TestCase):
+    
+    def test_int(self):
+        assert isinstance(1, Any)
+        

@@ -31,7 +31,7 @@ from unittest import TestCase
 from pytyp.s11n.json import make_JSONDecoder, JSONEncoder
 from pytyp._test.support import SimpleArgs, NamedArgs, MixedArgs, TypedArgs, \
     Config, User, Permission
-from pytyp.spec.base import Alt
+from pytyp.spec.abcs import Alt
 
 
 class JSONDecoderTest(TestCase):
@@ -42,7 +42,7 @@ class JSONDecoderTest(TestCase):
         assert result == target, result 
     
     def test_native(self):
-        self.assert_decode(str, '"abc"', 'abc')
+#        self.assert_decode(str, '"abc"', 'abc')
         self.assert_decode(list, '[1, 2.3]', [1,2.3])
         
     def test_classes(self):
@@ -90,7 +90,7 @@ class JSONEncoderTest(TestCase):
         result = self.__encoder.encode(value)
         assert result == target, result  
     
-    def test_native(self):
+    def test_encode_native(self):
         self.assert_encode('abc', '"abc"')
         self.assert_encode([1,2.3], '[1, 2.3]')
         

@@ -112,7 +112,7 @@ try:
         The documentation for `dump()` above contains an example of use.
         '''
         def load(stream, **kargs):
-            return decode(spec, safe_load(stream, **kargs))
+            return decode(safe_load(stream, **kargs), spec)
         return load
     
     
@@ -132,7 +132,7 @@ try:
         '''
         def load_all(stream, **kargs):
             for (s, d) in zip(spec, safe_load_all(stream, **kargs)):
-                yield decode(s, d)
+                yield decode(d, s)
         return load_all
 
 except ImportError:

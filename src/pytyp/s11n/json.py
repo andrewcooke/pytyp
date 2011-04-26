@@ -29,7 +29,8 @@
 from json import JSONDecoder as JSONDecoder_, load as load_, loads as loads_, \
     JSONEncoder as JSONEncoder_, dump as dump_, dumps as dumps_
 
-from pytyp.s11n.base import encode, DEFAULT_RAW, decode
+from pytyp.s11n.base import encode, decode
+from pytyp.spec.abcs import Atomic
 
 
 def dump(obj, fp, **kargs):
@@ -118,7 +119,7 @@ def make_JSONEncoder(raw):
     return JSONEncoder
 
 
-JSONEncoder = make_JSONEncoder(DEFAULT_RAW)
+JSONEncoder = make_JSONEncoder(Atomic)
 '''
 A custom encoder for the Python json module.
 '''
@@ -190,13 +191,10 @@ def make_JSONDecoder(spec):
 
     class JSONDecoder(JSONDecoder_):
         
-        def decode(self, *args, **kargs):
-            return decode(spec, super(JSONDecoder, self).decode(*args, **kargs))
-    
         def raw_decode(self, *args, **kargs):
             (decoded, index) = \
                 super(JSONDecoder, self).raw_decode(*args, **kargs)
-            return (decode(spec, decoded), index)
+            return (decode(decoded, spec), index)
 
     return JSONDecoder
 

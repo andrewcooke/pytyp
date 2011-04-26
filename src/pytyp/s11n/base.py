@@ -27,28 +27,22 @@
 # MPL or the LGPL License.
 
 from inspect import getfullargspec, getcallargs
-from collections import Callable, Iterable
-from pytyp.spec.base import dispatch
+from collections import Callable, Iterable, Mapping
+from pytyp.spec.abcs import expand, Atomic, Any, Map, Seq, Cls, normalize,\
+    type_error, Alt
 
 
-DEFAULT_RAW = (str,int,float,bool)
-'''
-Types that are not explicitly encoded, but instead passed through as raw
-values.
-'''
-
-
-def encode(obj, raw=DEFAULT_RAW, recurse=True, check_circular=True, 
+def encode(obj, raw=Atomic, recurse=True, check_circular=True, 
            strict=True):
     '''
     Encode a Python class as a dictionary.  This function can also encode
     lists, tuples and dictionaries containing classes, and nested classes.
 
     :param obj: The object to be encoded.
-    :param raw: Types that are not explicitly encoded, but passed through
-                as raw values (by default, `DEFAULT_RAW`).
+    :param raw: ABC for types that are not explicitly encoded, but passed 
+                through as raw values.
     :param recurse: Recursively encode values?  `encode` is designed to be
-                    used with other encodes; sometimes these expect only
+                    used with other encoders; sometimes these expect only
                     a single value to be encoded (`recurse=False`).
     :param check_circular: If `True`, an error is rased for circular
                            references (if disabled the encoding may loop
@@ -97,7 +91,7 @@ def encode(obj, raw=DEFAULT_RAW, recurse=True, check_circular=True,
       {'value': 1}
     '''
     
-    if type(obj) in raw:
+    if isinstance(obj, raw):
         return obj
     
     if check_circular is True:
@@ -151,14 +145,128 @@ def encode(obj, raw=DEFAULT_RAW, recurse=True, check_circular=True,
     return dict(unpack())
 
 
-def decode(spec, value):
+def class_to_dict_spec(cls):
+    '''
+    Create a type specification for a dict, given one for a class.  This 
+    reads any type annotation in the constructor, adds positional args as required, 
+    and adds keyword args (with defaults) as optional.
+    
+    :param cls: The class to encode
+    :return: `(varargs, varkw, spec)` where `varargs` is the name of the `*args`
+             parameter (or `None`); `varkw` is the name of the `**kargs` 
+             parameter (or `None`) and `spec` is the type specification.
+    
+    >>> class Example():
+    ...     def __init__(self, pos, ann:str, ann_deflt:int=42, *varargs, kwonly, kwonly_deflt='value', **varkw):
+    ...         pass
+    >>> #class_to_dict_spec(Example)
+    #('varargs', 'varkw', {Opt('ann_deflt'): <class 'int'>, 'ann': <class 'str'>, 'pos': None, Opt('kwonly_deflt'): None, Opt('varargs'): None, Opt('varkw'): None, 'kwonly': None})
+    '''
+    argspec = getfullargspec(cls._abc_class.__init__)
+    newspec = {}
+    names = set()
+    # types defined by user
+    if argspec.annotations:
+        for name in argspec.annotations:
+            if name != 'return' and name != 'self':
+                if name in (argspec.varargs, argspec.varkw):
+                    key = Map.OptKey(name)
+                else:
+                    key = name
+                newspec[key] = normalize(argspec.annotations[name])
+                names.add(name)
+    # other args with default are optional
+    if argspec.defaults:
+        for name in argspec.args[-len(argspec.defaults):]:
+            if name not in names:
+                newspec[Map.OptKey(name)] = Any
+            else:
+                newspec[Map.OptKey(name)] = newspec.pop(name)
+            names.add(name)
+    # other args are required
+    if argspec.args:
+        for name in argspec.args:
+            if name not in names and name != 'self':
+                newspec[name] = Any
+                names.add(name)
+    if argspec.kwonlyargs:
+        for name in argspec.kwonlyargs:
+            if name not in names:
+                if argspec.kwonlydefaults and name in argspec.kwonlydefaults:
+                    newspec[Map.OptKey(name)] = Any
+                else:
+                    newspec[name] = Any
+                names.add(name)
+    # *args and **kargs are optional
+    if argspec.varargs and argspec.varargs not in names:
+        newspec[Map.OptKey(argspec.varargs)] = Any
+    if argspec.varkw and argspec.varkw not in names:
+        newspec[Map.OptKey(argspec.varkw)] = Any
+    return (argspec.varargs, argspec.varkw, Map(_dict=newspec))
+
+
+# decode starts w single spec/value.
+# transcode handles single value - either rewrites or calls expand.
+# expand needs a callback for multiple values.  so transcode needs to 
+# pass in a callback that (1) calls transcode for each in turn and 
+# (2) assembles the data correctly.
+
+
+
+
+def transcode(value, spec):
+    if issubclass(spec, Cls) and spec._abc_class != object:
+        if isinstance(value, Mapping):
+            (varargs, varkw, dict_spec) = class_to_dict_spec(spec)
+            new_value = transcode(value, dict_spec)
+            args = new_value.pop(Map.OptKey(varargs), []) if varargs else []
+            kargs = new_value.pop(Map.OptKey(varkw), {}) if varkw else {}
+            args.extend(new_value.pop(index) 
+                        for index in sorted(key 
+                            for key in new_value.keys() 
+                            if isinstance(Map.OptKey.unpack(key), int)))
+            kargs.update((Map.OptKey.unpack(key), value) 
+                         for (key, value) in new_value.items())    
+            return spec._abc_class(*args, **kargs)
+        elif isinstance(value, spec):
+            return value
+        else:
+            type_error(value, spec)
+    elif issubclass(spec, Seq):
+        return list(spec._expand(value, lambda vsn: (transcode(v, s) for (v, s, n) in vsn)))
+    elif issubclass(spec, Map):
+        if spec._int_keys():
+            return tuple(spec._expand(value, 
+                        lambda vsn: (transcode(v, s) 
+                                     for (v, s, n) in sorted(vsn, 
+                                                key=lambda vsn: Map.OptKey.unpack(vsn[2])))))
+        else:
+            return dict(spec._expand(value, 
+                        lambda vsn: ((n, transcode(v, s)) for (v, s, n) in vsn)))
+    elif issubclass(spec, Alt):
+        def alternative(vsn):
+            error = None
+            for (v, s, _) in vsn:
+                try:
+                    return transcode(v, s)
+                except TypeError as e:
+                    error = e
+            raise error
+        return spec._expand(value, alternative)
+    elif isinstance(value, spec):
+        return value
+    else:
+        type_error(value, spec)
+
+
+def decode(value, spec):
     '''
     Decode a dictionary of data as a Python class.  This function can also 
     decode lists, tuples and dictionaries of values, and nested values.
 
+    :param value: The data to decode.
     :param spec: The class (more generally, the type specification - see
                  below) to create.
-    :param value: The data to decode.
     :result: A set of Python objects structured as `spec`, containing the
              data from `value`.
 
@@ -175,7 +283,7 @@ def decode(spec, value):
       ...     def __repr__(self):
       ...         return '<DecExample({0})>'.format(self.a)
       ...
-      >>> decode([DecExample], [{'a': 1}, {'a': 2}])
+      >>> decode([{'a': 1}, {'a': 2}], [DecExample])
       [<DecExample(1)>, <DecExample(2)>]
 
     To handle nested types the constructor of the container class must have
@@ -187,7 +295,7 @@ def decode(spec, value):
       ...     def __repr__(self):
       ...         return '<Container({0})>'.format(self.ex)
       ...
-      >>> decode(Container, {'ex': {'a': 1}})
+      >>> decode({'ex': {'a': 1}}, Container)
       <Container(<DecExample(1)>)>
 
     Note the type declaration in the constructor above.  Without that
@@ -199,26 +307,22 @@ def decode(spec, value):
       ...     def __repr__(self):
       ...         return '<BadContainer({0})>'.format(self.ex)
       ...
-      >>> decode(BadContainer, {'ex': {'a': 1}})
+      >>> decode({'ex': {'a': 1}}, BadContainer)
       <BadContainer({'a': 1})>
 
     In type specifications, lists must be of a single type, but tuples and
     dicts have a specific type for each member::
     
-      >>> decode((Container, DecExample), ({'ex': {'a': 1}}, {'a': 2}))
+      >>> decode(({'ex': {'a': 1}}, {'a': 2}), (Container, DecExample))
       (<Container(<DecExample(1)>)>, <DecExample(2)>)
 
     A value of None can be matched by an optional type::
 
-      >>> from pytyp.spec.base import Opt
-      >>> decode((Opt(Container), DecExample), (None, {'a': 2}))
+      >>> from pytyp.spec.abcs import Opt
+      >>> decode((None, {'a': 2}), (Opt(Container), DecExample))
       (None, <DecExample(2)>)
     '''
-    return dispatch(value, spec,
-        on_single=lambda value, spec: value,
-        on_sequence=lambda value, spec: [decode(spec.spec, v) for v in value],
-        on_record=lambda nvs: ((n, decode(s, v)) for (n, v, s) in nvs),
-        coerce_dict_to_class=lambda cls, args, kargs: cls(*args, **kargs))
+    return transcode(value, normalize(spec))
 
 
 if __name__ == "__main__":

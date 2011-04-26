@@ -31,6 +31,7 @@ from unittest import TestCase
 from pytyp.s11n.base import encode, decode
 from pytyp._test.support import SimpleArgs, NamedArgs, ArgsAndKArgs,\
     MissingKArgs, TypedKArgs
+from pytyp.spec.abcs import fmt
 
 
 class RoundtripTest(TestCase):
@@ -38,9 +39,11 @@ class RoundtripTest(TestCase):
     def assert_roundtrip(self, spec, obj, target=None, strict=True):
         target = target or obj
         intermediate = encode(obj, strict=strict)
-        #print(intermediate)
-        result = decode(spec, intermediate)
+        result = decode(intermediate, spec)
         assert result == target, result
+        
+    def test_atomic(self):
+        self.assert_roundtrip(int, 1)
     
     def test_tuple(self):
         self.assert_roundtrip((SimpleArgs, NamedArgs),

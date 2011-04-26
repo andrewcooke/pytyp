@@ -118,7 +118,7 @@ class Typed:
       >>> c.b = 2
       Traceback (most recent call last):
         ...
-      TypeError: Value inconsistent with type: 2!:<class 'str'>
+      TypeError: Value 2 inconsistent with type str.
     '''
     
     def __init__(self):
@@ -152,7 +152,7 @@ class TypedDict(dict):
       >>> td['b'] = 'two'
       Traceback (most recent call last):
         ...
-      TypeError: Value inconsistent with type: two!:<class 'int'>
+      TypeError: Value 'two' inconsistent with type int.
       >>> del td['b']
       >>> td['b'] = 'two'
       >>> td['b'] = 2
@@ -160,7 +160,7 @@ class TypedDict(dict):
       >>> td['b'] = 2
       Traceback (most recent call last):
         ...
-      TypeError: Value inconsistent with type: 2!:<class 'str'>
+      TypeError: Value 2 inconsistent with type str.
     '''
 
     def __init__(self, *args, **kargs):
@@ -194,7 +194,7 @@ class TypedDict(dict):
         if isinstance(value, TypedValue):
             super(TypedDict, self).__setitem__(name, value)
         else:
-            spec = self.typed_get(name).spec if name in self else Any()
+            spec = self.typed_get(name).spec if name in self else Any
             super(TypedDict, self).__setitem__(name, TypedValue(value, spec))
 
     def values(self):

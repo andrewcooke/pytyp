@@ -487,8 +487,7 @@ from the JSON data)::
   ...     def __init__(self, *examples:[Example]):
   ...         self.examples = examples
   ...     def __repr__(self):
-  ...         return '<Container({0})>'.\
-		  format(','.join(map(repr, self.examples)))
+  ...         return '<Container({0})>'.format(','.join(map(repr, self.examples)))
   >>> loads = make_loads(Cls(Container))
   >>> loads('{"examples": [{"foo":"abc"}, {"foo":"xyz"}]}')
   <Container(<Example(abc)>,<Example(xyz)>)>
@@ -662,14 +661,8 @@ sumtypes shoudl be less ugly.
 Appendix: ``pytyp`` Extensions
 ------------------------------
 
-Extensions
-~~~~~~~~~~
-
-The following features are supported by ``pytyp`` but not discussed in the
-text above.
-
-Natural Syntax
-..............
+Natural Syntax and Normalisation
+................................
 
 ``pytyp`` supports the "natural" syntax described above, but the
 ``normalize()`` function may be necessary when used in contexts that require a

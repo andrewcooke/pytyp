@@ -18,7 +18,7 @@ Atomic.register(bool)
 
 
 class Normalized(metaclass=ABCMeta): pass
-
+    # must be applied directly!
 
 class RecursiveType(TypeError):
     
@@ -104,7 +104,7 @@ def normalize(spec):
             return spec
         elif issubclass(spec, Atomic):
             return spec
-        elif issubclass(spec, Normalized):
+        elif Normalized in spec.__bases__:
             return spec
         else:
             return Cls(spec)
@@ -126,6 +126,11 @@ def expand(value, spec, callback):
     return normalize(spec)._expand(value, callback)
     
     
+def type_error(value, spec):
+    raise TypeError('Value {0!r} inconsistent with type {1}.'\
+                    .format(value, fmt(spec)))
+        
+        
 def _hashable_types(args, kargs):
     types = dict((name, normalize(karg)) for (name, karg) in kargs.items())
     for (index, arg) in zip(count(), args):
@@ -164,7 +169,7 @@ def _polymorphic_subclass(abc, args, kargs, _normalize=None):
         # replaced a standard class definition with this to help with debugging
         # as it was confusing when everything had the same name
         subclass = type(abc)(abc.__name__ + '_' + str(hash(types)),
-                             (abc,),
+                             (abc, Normalized),
                              {'_abc_type_arguments': types,
                               '_abc_instance_registry': WeakSet(),
                               'register_instance': register_instance,
@@ -176,13 +181,10 @@ def _polymorphic_subclass(abc, args, kargs, _normalize=None):
 
 class Product:
     
-    @staticmethod
-    def _verify_contents(vsn):
+    @classmethod
+    def _verify(cls, vsn):
         try:
-#            from functools import reduce
-#            from operator import __and__
-#            return reduce(__and__, map(lambda x: isinstance(x[0], x[1]), vsn), True)
-            for (v, s, _n) in vsn:
+            for (v, s, _) in vsn:
                 if not isinstance(v, s):
                     return False
             return True
@@ -192,19 +194,16 @@ class Product:
 
 class Sum:
     
-    @staticmethod
-    def _verify_contents(vsn):
+    @classmethod
+    def _verify(cls, vsn):
         try:
-#            from functools import reduce
-#            from operator import __or__
-#            return reduce(__or__, map(lambda x: isinstance(x[0], x[1]), vsn), False)
-            for (v, s, _n) in vsn:
+            for (v, s, _) in vsn:
                 if isinstance(v, s):
                     return True
-            return False
         except TypeError:
-            return False
-
+            pass
+        return False
+    
 
 class Seq(Sequence, Product, Normalized):
     
@@ -231,7 +230,7 @@ class Seq(Sequence, Product, Normalized):
             
     @classmethod
     def _structuralcheck(cls, instance):
-        return cls._expand(instance, cls._verify_contents)
+        return cls._expand(instance, cls._verify)
             
     @classmethod
     def _fmt(cls):
@@ -249,6 +248,9 @@ class Map(Mapping, Product, Normalized):
         
         def __init__(self, name):
             self.name = name
+            
+        def __repr__(self):
+            return '__' + str(self.name)
             
         @staticmethod
         def unpack(name):
@@ -312,7 +314,14 @@ class Map(Mapping, Product, Normalized):
         
     @classmethod
     def _structuralcheck(cls, instance):
-        return cls._expand(instance, cls._verify_contents)
+        return cls._expand(instance, cls._verify)
+
+    @classmethod
+    def _int_keys(cls):
+        for (name, _) in cls._abc_type_arguments:
+            if not isinstance(Map.OptKey.unpack(name), int):
+                return False
+        return True
 
     @classmethod
     def _fmt(cls):
@@ -353,7 +362,7 @@ class Alt(Sum, Normalized, metaclass=ABCMeta):
         
     @classmethod
     def _structuralcheck(cls, instance):
-        return cls._expand(instance, cls._verify_contents)
+        return cls._expand(instance, cls._verify)
 
     @classmethod
     def _fmt(cls):
@@ -370,10 +379,10 @@ class Alt(Sum, Normalized, metaclass=ABCMeta):
             for (name, spec) in cls._abc_type_arguments:
                 if choice == name and isinstance(value, spec):
                     return choices[choice](value)
-        raise TypeError('Cannot dispatch {0} on {1}'.format(value, fmt(self)))
+        raise TypeError('Cannot dispatch {0} on {1}'.format(value, fmt(cls)))
 
 
-class Opt(Alt):
+class Opt(Alt, Normalized):
     
     # defining this as a subclass of Alt, rather than simple function that calls
     # Alt just gives a nicer formatting
@@ -395,15 +404,16 @@ class Opt(Alt):
             return 'Opt'
     
 
-class _Cls:
+class Cls:
     
-    def __init__(self):
-        self._abc_class_cache = WeakKeyDictionary()
+    _abc_class_cache = WeakKeyDictionary()
     
-    def __call__(self, class_, *args, _normalize=normalize, **kargs):
-        if class_ not in self._abc_class_cache:
+    def __new__(cls, class_, *args, _normalize=normalize, **kargs):
+        if class_ not in cls._abc_class_cache:
 
-            class __Cls(Product, Normalized, metaclass=ABCMeta):
+            # TODO - convert to call to type with name
+
+            class __Cls(Cls, Product, Normalized, metaclass=ABCMeta):
                 
                 _abc_polymorphic_cache = {}
                 _abc_class = class_
@@ -418,7 +428,7 @@ class _Cls:
 
                 @classmethod
                 def _structuralcheck(cls, instance):
-                    return cls._expand(instance, cls._verify_contents)
+                    return cls._expand(instance, cls._verify)
 
                 @classmethod
                 def _fmt(cls):
@@ -428,12 +438,10 @@ class _Cls:
                                ','.join('{0}={1}'.format(name, fmt(spec))
                                         for (name, spec) in cls._abc_type_arguments))
         
-            self._abc_class_cache[class_] = __Cls
-        return _polymorphic_subclass(self._abc_class_cache[class_], args, kargs,
+            cls._abc_class_cache[class_] = __Cls
+        return _polymorphic_subclass(cls._abc_class_cache[class_], args, kargs,
                                     _normalize=_normalize)
     
-Cls = _Cls()
-
 Any = Cls(object)
 
 

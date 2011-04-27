@@ -22,12 +22,14 @@ Polymorphic ABCs
 
 :Subtitle: Exploring Types in Python
 :Author: Andrew Cooke (andrew@acooke.org)
-:Version: 0.3 of 17-04-2011
+:Version: 0.4 of 17-04-2011
 
 Abstract
 --------
 
-To do.
+I explore what "pythonic" polymorphic types might mean, present a library that
+implements one approach, and suggest a few small changes to the base language
+as a consequence.
 
 .. contents::
    :depth: 2
@@ -38,15 +40,13 @@ Introduction
 Context
 ~~~~~~~
 
-This all start as an attempt to improve JSON / Python inter-operability.  That
-used some type–related code that naturally led to verification of type
-annotations.  At which point I started writing this paper to record my
-internal dialogue about how types could be extended in Python.
+This started with a JSON library that described Python data using function
+annotations.  That raised wider questions about "pythonic" types.  To answer
+those I started writing this paper, which soon took on a life of its own.
+When it settled, eventually, in a consistent approach, I rewrote the library
+to match.
 
-The paper then took on a life of its own and I rewrote the library to match
-the most consistent approach I could find.
-
-So this is an exploration of one way to extend "types" in Python.  The end
+So this is an exploration of one way to extend types in Python.  The end
 result is implemented in a library called ``pytyp``.
 
 Roadmap
@@ -54,24 +54,23 @@ Roadmap
 
 In the first section, `Current Status`_, I sketch Python's runtime type
 support.  This shows how ABCs provide a clear, general model for duck typing.
+The next section, `Discussion`_, motivated by a need to describe collections
+of data, explores how ABCs might include more information.  A concete
+implementation is given in `The pytyp Library`_ (more details in `Appendix:
+pytyp Extensions`_).  Finally, in `Conclusions`_, I review the most import
+lessons from this work.
 
-`A Pythonic Extension`_ then explores possible exntensions, motivated by a
-need to describe collections of data.  The first few sub-sections are
-speculative; the issues are clarified in an `Implementation`_ and illustrated
-with `Examples`_.
-
-[Needs fixing once done]
 
 Terminology
 ~~~~~~~~~~~
 
-Many terms used to discuss types have specific meanings related to the
-verification of program properties.  In this paper I am addressing a different
-subject [#]_.  This means that I will often use the word "type" in a poorly
-defined way.  When I need more precision I will use "(static) type system"
-(about which one can reliably reason without executing code), "type
-specification" (metadata using ABCs to describe Python classes), and "duck
-types" (a model of runtime behaviour using available attributes).
+Many terms used to discuss types have meanings related to the verification of
+program properties.  In this paper I am addressing a different subject [#]_.
+This means that I will often use the word "type" in a poorly defined way.
+When I need more precision I will use "(static) type system" (about which one
+can reliably reason without executing code), "type specification" (metadata
+using ABCs to describe Python classes), and "duck types" (a model of runtime
+behaviour using available attributes).
 
 .. [#] Although, in the section `A Little Formality`_, I discuss how type
    systems can guide type specifications.
@@ -98,15 +97,15 @@ universally referred to as its type and available at runtime via the
 However, the attributes associated with an object are not fixed — it is
 possible to modify objects through various mechanisms (including meta-classes
 and direct manipulation of the underlying dictionaries) — and the language
-runtime does not use the object's class to guide execution [#]_.  Instead, each
-operation succeeds or fails depending on whether any necessary attribute is
-present on the instance in question.
+runtime does not use the object's class to guide execution [#]_.  Instead,
+**each operation succeeds or fails depending on whether any necessary
+attribute is present on the instance in question**.
 
 Even so, the notion that an instance's type is its class, and that this
-describes how it will behave, is very useful in practice — experienced
-Python programmers still describe the behaviour of programs in terms of types
-and classes.  This is because Python's extreme flexibility, although useful
-and powerful, is rarely exploited.
+describes how it will behave, is very useful in practice: experienced Python
+programmers still describe the behaviour of programs in terms of types and
+classes.  This is because Python's extreme flexibility, although useful and
+powerful, is rarely exploited to the full.
 
 .. [#] Except for immutable types, which exist partly so that the
    implementation *can* make such an assumption and so operate more
@@ -130,7 +129,7 @@ implements (and defines) duck typing.
 Recent Extensions
 ~~~~~~~~~~~~~~~~~
 
-Recent work has extended the language in two interesting ways.
+Recent work extended the language in two interesting ways.
 
 First, it addressed the conflict described above: on the one hand, programmers
 behave as though Python's runtime behaviour can be reliably explained in terms
@@ -147,7 +146,7 @@ duck types [#]_::
   ...     def foo(self): pass
   >>> class MyExample:
   ...     def foo(self): return 42
-  >>> isinstance(MyExample(), MyAbc)
+  >>> issubclass(MyExample, MyAbc)
   False
 
 .. [#] Except by explicitly checking all attributes through introspection
@@ -162,16 +161,14 @@ attributes** [#]_.
 .. [#] No connection with witness types in Haskell is implied, although the
    idea is loosely related.
 
-Second, Python 3 supports (but does enforce) type annotations.  These are
-metadata associated with functions [#]_.  For example, the following is
-valid::
+Second, Python 3 supports type annotations.  These are metadata associated
+with functions [#]_.  For example, the following is valid::
 
   def func(a:int, b:str) -> list:
       return [a, b]
 
-.. [#] Python docs call them "function annotations", but the use cases in
-   PEP3107 all refer to types (the PEP does not explain why only functions
-   were considered, except that generator annotations were "ugly").
+.. [#] Python documentation calls them "function annotations", but the use
+   cases in PEP3107 all refer to types.
 
 Type annotations are not interpreted or enforced by the language runtime.
 They are added to the function metadata and exposed through Python's
@@ -188,7 +185,7 @@ Recent work has started to build on this foundation by reifying collections of
 attributes (ABCs) and allowing metdata (formatted in a manner traditionally
 associated with types) to be specified on functions.  However, ABCs act only
 as a witness to types (an unverified tag); they do not perform any runtime
-checks.
+checks.  Nor are type annotations verified.
 
 Discussion
 ----------
@@ -196,12 +193,8 @@ Discussion
 Typed Collections
 ~~~~~~~~~~~~~~~~~
 
-Syntax
-......
-
-To motivate our exploration consider the following questions.  How do we
-define the type of a list of values?  Or a dictionary?  What if the contents
-are drawn from an inhomogenous set of types?
+To motivate the discussion below consider the following questions.  How do we
+define the type of a list of values?  Or a dictionary?
 
 Answering these with tools from the previous section would start with the
 appropriate container ABC.  This defines the attributes used to access the
@@ -219,8 +212,8 @@ current approach.
    annotations don't exist for generators
    http://mail.python.org/pipermail/python-3000/2006-May/002103.html; it's
    unclear how to backfit types to an existing API; type annotations are not
-   "implemented"; as is normal with current type systems it supports only
-   homogenous sequences.
+   "implemented"; it supports only homogenous sequences (as is normal with
+   current type systems).
    
 One problem is easy to fix.  We can define a simpler syntax: ``[int]`` or,
 more formally, ``Seq(int)``.  I will call this a *type specification*.
@@ -228,8 +221,7 @@ more formally, ``Seq(int)``.  I will call this a *type specification*.
 This can be extended to inhomogenous collections: dictionaries would look like
 ``{'a':int, 'b':str}``; tuples like ``(int, str)``.  And since it would make
 sense to use the ABC ``Mapping`` a better syntax might be ``Map(a=int,
-b=str)`` or ``Map(int, str)`` with implicit integer indices for positional
-arguments.
+b=str)`` or ``Map(int, str)``.
 
 But we have a problem: the step from sequences to maps was more significant
 than a simple change of syntax.  **When we try to translate** ``Map()`` **back
@@ -259,13 +251,12 @@ seems more suited to user–defined classes.
 **Identification** of a value's type, although superficially similar to
 verfication, is a harder problem.  In some simpler cases we may have a set of
 candidate types, in which case we can verify them in turn; in other cases the
-instance's class may inherit from one or more ABCs (this would still need
-extending to include type information); but I don't see a good, "pythonic"
-solution to the general problem.  Perhaps type witnesses (ABCs extended to
-include type information) could pool registry information?
+instance's class may inherit from one or more ABCs; but I don't see a good,
+"pythonic" solution to the general problem.  Perhaps ABCs could pool registry
+information?
 
 **Expansion** of a value by type covers a variety of uses where we want to
-operate on some sub-set of the data and, perhaps, recombine the results.  One
+operate on some subset of the data and, perhaps, recombine the results.  One
 example is to automate mapping between ``dict`` and user–defined classes.
 Another is structural type verification.
 
@@ -281,7 +272,7 @@ type theory: parametric polymorphism; product types; and sum types.
 Parametric Polymorphism
 .......................
 
-Since we started with data structurs we have already addressed this:
+Since we started with data structures we have already addressed this:
 ``Seq(x)`` is polymorphic in ``x``, for example.  However, it's worth drawing
 attention to an important point: **polymorphism occurs naturally in Python
 data structures at the level of instances, not classes**.  This contrasts with
@@ -289,10 +280,10 @@ the current implementation of witness typing, ABCs, which is at the class
 level.
 
 So the idea that ``isinstance([1,2,3], Seq(int))`` should return ``True``
-implies a significant change to the language semantics — ``isinstance()``
+implies a significant change to the language semantics: ``isinstance()``
 would depend on the *state* of an instance as well as its class.  The
 relationship between ``isinstance()`` and ``issubclass()`` would shift: the
-former could no longer be expressed in terms of the latter.
+former could no longer be expressed in terms of the latter (alone).
 
 Product Types
 .............
@@ -313,8 +304,8 @@ arguments are present as instance attributes — we can defined a
           self.b = b
 
 Incidentally, this has an advantage over ``Map()``: it does not require
-dependent types when reduced to ABCs.  This is because each attribute would be
-described separately, and so could have its own type.
+dependent types when reduced to ABCs with type annotations.  This is because
+each attribute would be described separately and so could have its own type.
 
 And isn't this familiar?  It's very like named tuples.  Except that they are
 second class citizens that don't directly support type annotations...
@@ -332,31 +323,32 @@ for example).
 Summary
 ~~~~~~~
 
-This section has introduced a syntax that can describe parametric polymorphism
+This section introduced a syntax that can describe parametric polymorphism
 within Python code, largely at the instance level.  It is flexible enough to
 handle basic concepts from type theory (roughly translated into Python's
 runtime context).
 
 Providing a semantics for these type specifications, particularly one related
-to existing features, is more complex.  In particular, adding type annotations
-to ABCs faces significant problems.  First, it is incomplete: attributes and
-generators do not support annotations.  Second, dependent types would be needed to handle ``dict``.  Third, it
-is verbose, particularly when using the standard container classes, which must
-to be subclassed for every distinct use, but also because it ignores
-correlations between the types of different attributes.
+to existing features, is more difficult.  In particular, adding type
+annotations to ABCs faces significant problems.  First, it is incomplete:
+attributes, generators and named tuples do not support annotations.  Second,
+dependent types would be needed to handle ``dict``.  Third, it is verbose,
+particularly when using standard container classes which must be subclassed
+for every distinct use, but also because it ignores correlations between the
+types of different attributes.
 
 Registration (witness typing) is more promising, but cannot handle all cases;
-a general solution will also require a structural (piecewise inspection)
+a general solution would also require a structural (piecewise inspection)
 approach.
 
-In fact, the structural and witness semantics are complementary: witnesses
-would work well for user-defined classes; structural typing is better suited
-to Python's built–in container types.  There is a trade–off between
-convenience and speed: where necessary built–in containers can be replaced by
-immutable, registered custom classes.
+In fact, the **structural and witness semantics are complementary**: witnesses
+would work well for user-defined classes; structural typing would be better
+suited to the built–in container types.  There would be a trade–off between
+convenience and speed: where necessary built–in containers could be replaced
+by immutable, registered custom classes.
 
-Implementation
---------------
+The ``pytyp`` Library
+---------------------
 
 Approach
 ~~~~~~~~
@@ -418,6 +410,8 @@ With this in place, registration works as expected::
     >>> Seq(int).register_instance(random_object)
     >>> isinstance(random_object, Seq(int))
     True
+    >>> isinstance(random_object, Seq(float))
+    False
 
 .. [#] http://www.python.org/dev/peps/pep-3119/
 .. [#] http://bugs.python.org/issue1708353
@@ -434,19 +428,28 @@ Unfortunately, neither approach above will help with a list of integers,
 we need this to work at the instance level) and registration fails (the value
 cannot be hashed).
 
-In cases like this we must fall back to structural verification — each entry
-is checked in turn.  This is inefficient, of course, so the programmer must
+In cases like this we must fall back to structural verification: each entry is
+checked in turn.  This is inefficient, of course, so the programmer must
 consider whether it is appropriate::
 
     >>> isinstance([1,2,3], Seq(int))
     True
 
+Note that structural typing is disabled if the class inherits from a
+polymorphic ABC.  This is to avoid confusing results with empty containers.
+For example the following would have returned true if structural typing had
+been invoked::
+
+    >>> class MyIntList(list, Seq(int)): pass
+    >>> isinstance(MyIntList(), Seq(float))
+    False
+
 Expansion
 ~~~~~~~~~
 
 Expansion can be implemented as a recursive exploration of the graph implicit
-in the type specification.  Callbacks allow values to be processed; these can
-recurse on their contents, giving the caller control over exactly what values
+in the type specification.  A callback allows values to be processed and can
+recurse on its contents, giving the caller control over exactly what values
 are "atomic".  Exceptions are made available to the callback by providing the
 data as generators.
 
@@ -460,22 +463,21 @@ The ``checked`` decorator verifies parameters and return values against the
 specification in the type annotation::
 
   >>> @checked
-  ... def str_len(s:str) -> int:
+  ... def int_list_len(s:Seq(int)) -> int:
   ...     return len(s)
-  >>> str_len('abc')
+  >>> int_list_len([1,2,3])
   3
-  >>> str_len([1,2,3])
+  >>> int_list_len('abc')
   Traceback (most recent call last):
     ...
-  TypeError: Value [1, 2, 3] inconsistent with type str.
+  TypeError: Value 'abc' inconsistent with type Seq(int).
 
 JSON Decoding
 .............
 
-Here JSON data, expressed using generic data–structures, is decoded into
-Python classes.  The type specification is used to guide the decoding (the
-argument to ``make_loads()`` is the type specification we want to construct
-from the JSON data)::
+Here JSON data, expressed using generic data–structures, are decoded into
+Python classes.  The type specification is used to guide the decoding
+(implemented through recursive expansion, as outlined earlier)::
 
   >>> class Example():
   ...     def __init__(self, foo):
@@ -491,104 +493,20 @@ from the JSON data)::
   >>> loads('{"examples": [{"foo":"abc"}, {"foo":"xyz"}]}')
   <Container(<Example(abc)>,<Example(xyz)>)>
 
-Review
-~~~~~~
+Conclusions
+-----------
 
-It's possible to see, in outline, how Python's ABCs and type annotations, used
-within the Python language (ie. at runtime) could support both product types
-and parametric polymorphism.  The work required by a programmer to exploit
-these measures directly would be significant, but could be reduced by a
-library providing a higher–level interface.
+(In progress)
 
-However, many problems remain before this becomes a practical option.
+Possible and Pythonic
+~~~~~~~~~~~~~~~~~~~~~
 
-Generator Type Annotations
-..........................
+``pytyp`` Discussion
+~~~~~~~~~~~~~~~~~~~~
 
-Generators do not support type annotations [#]_.  This makes it impossible to
-completely specify many types and is particularly damaging for the common case
-of standard collections.
+Backfitting existing APIs.
 
-.. [#] http://www.python.org/dev/peps/pep-3107/
-
-Interestingly, one suggested solution for annotating generators [#]_ had a
-syntax that resembles type-parameterised ABCs (see below).
-
-.. [#] http://mail.python.org/pipermail/python-3000/2006-May/002104.html
-
-ABC Properties
-..............
-
-Defining an ABC that includes typed properties, to specify the types of
-attributes, is very verbose.  TODO - try this!
-
-Parameterised ABCs with Type Annotations
-........................................
-
-The various attributes in an ABC for a ``Sequence``, say, have closely related
-types.  This could be expressed as a function, so ``Sequence(int)`` would
-generate the ABCs for a sequence of ``int`` values.
-
-Fixing this on an ad–hoc basis does not require any changes to the core
-language.  But perhaps a fix to `Type Annotation Scope`_ could also provide a
-mechanism to simplify this?
-
-ABC Constructors
-................
-
-Since ABCs are, by definition, abstract, they do not support 
-
-DO ABCs DO WHAT I THINK THEY DO? nope.
-
-Incomplete ABCs
-...............
-
-Sugar for Properties
-
-Correlated Attribute Types
-
-[Also, class-like products correlate constructor and accessor.  Constructor?!]
-
-How do we get from ``[int]`` to the code outlined in `Typed Collections`_?  We
-can use a function, similar to the handling of polymorphism and functors
-above.  Perhaps ABCs themselves should be parameterised?  This would codify a
-particular relationship between the type annotations of different methods.
-The same idea, in more general terms can be phrased as "how should information
-be shared between type annotations on a class?"  One answer might be to allow
-them access to attributes defined on ``self``.
-
-some other tag that indicates type?  related to constructor args?  could be
-library dependent.  that seems to be a problem.  same problem also applies to
-type annotations.  suggests that some standard should emerge and be adapted by
-the language core.
-
-Typed Objects v Datatypes
-.........................
-
-Maybe we need a special datatype for Class(a=..): self.a=... - but isn't that
-what named tuples are meant to do?
-
-
-Sum Types (Alternatives)
-........................
-
-For more complete coverage of common structures sum types are needed.  One way
-to do this would be to extend the syntax of type annotations to include
-alternatives (separated by a comma?).  Another, more exotic, approach might be
-possible through an "Amb" operator, adding ambiguity to the language.
-
-Maps and Attributes (Products and Dependent Types)
-..................................................
-
-Named tuples too.
-
-Active Type Annotations
-.......................
-
-What do they do?
-
-Efficiency
-..........
+Embedding — Solves many problems, but makes optimisation hard.
 
 The ``pytyp`` package is implemented in Python.  This makes it flexible, but
 extremely inefficient.  For the occasional type check when debugging this is
@@ -606,13 +524,19 @@ simplified by allowing arbitrary tags on values?  Are there useful parallels
 between type verification and the "unexpected path" handling of a dynamic
 language JIT compiler?
 
-Language v Library
-..................
+Problems in Python
+~~~~~~~~~~~~~~~~~~
 
-Backfitting existing APIs.
+Types are a formalization of the system.  They expose inconsistencies like the
+handling of mutable sequences (settitem v hash; iadd on types).
 
-Consistency
-...........
+namedtuples should be less ugly.
+
+Generator Type Annotations
+
+Sugar for ABC Properties and Correlated Attribute Types
+
+No sum types
 
 I understand that Python has grown in an irganic manner, and that this is a
 strenght of the language.  I also believe that the cautious, inremental manner
@@ -621,33 +545,14 @@ why, why, are there so many inconsistencies and irregularities?  Why are
 namedtuples only half implemented?  Why is scope still broken?  Why are type
 annotations available only on functions?
 
-Mutable State and Collections
-.............................
+Mutable State and Collections - A flag that indicates change?
 
-A flag that indicates change?
-
-Conclusions
------------
-
-[Check what ABCs actually do]
-
-Embedding — Solves many problems, but makes optimisation hard.
-
-Types are a formalization of the system.  They expose inconsistencies like the
-handling of mutable sequences (settitem v hash; iadd on types).
-
-define everything in terms of new abcs + use register.  make the abcs
-parametric.  are abcs transitive(sp?)
-
-types increase granularity of abcs to instances.
-
-sumtypes shoudl be less ugly.
 
 Appendix: ``pytyp`` Extensions
 ------------------------------
 
 Natural Syntax and Normalisation
-................................
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``pytyp`` supports the "natural" syntax described above, but the
 ``normalize()`` function may be necessary when used in contexts that require a
@@ -671,7 +576,7 @@ from the metaclass, which must be ``ABCMeta`` for inter–operation with
 existing classes.
 
 Optional Records
-................
+~~~~~~~~~~~~~~~~
 
 Optional records can be specified with a leading double underscore [#]_,
 which can be useful mapping between ``dict`` and function parameters (default
@@ -693,7 +598,7 @@ optional records::
     True
 
 User–Defined Classes
-....................
+~~~~~~~~~~~~~~~~~~~~
 
 For user–defined classes we need another level of parameterisation:
 ``Cls(UserClass)(int, str)`` or, more simply, ``Cls(UserClass, int, str)``
@@ -715,7 +620,10 @@ Structural typing of classes uses attribute names::
     True
 
 Circular References
-...................
+~~~~~~~~~~~~~~~~~~~
+
+These are defined using ``Delayed()`` which allows references to a type to be
+made before it is known.
 
     >>> d = Delayed()
     >>> d.set(Alt(int, d, str))
@@ -723,7 +631,7 @@ Circular References
     'Delayed(Alt(0=int,1=...,2=str))'
 
 Dispatch by Type
-................
+~~~~~~~~~~~~~~~~
 
 It's hard to find a convincing example for this [#]_, but since it is easy to
 implement::

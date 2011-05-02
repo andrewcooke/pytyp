@@ -28,7 +28,7 @@
 
 from inspect import getfullargspec, getcallargs
 from collections import Callable, Iterable, Mapping
-from pytyp.spec.abcs import expand, Atomic, Any, Map, Seq, Cls, normalize,\
+from pytyp.spec.abcs import expand, Atomic, Any, Rec, Seq, Cls, normalize,\
     type_error, Alt
 
 
@@ -170,7 +170,7 @@ def class_to_dict_spec(cls):
         for name in argspec.annotations:
             if name != 'return' and name != 'self':
                 if name in (argspec.varargs, argspec.varkw):
-                    key = Map.OptKey(name)
+                    key = Rec.OptKey(name)
                 else:
                     key = name
                 newspec[key] = normalize(argspec.annotations[name])
@@ -179,9 +179,9 @@ def class_to_dict_spec(cls):
     if argspec.defaults:
         for name in argspec.args[-len(argspec.defaults):]:
             if name not in names:
-                newspec[Map.OptKey(name)] = Any
+                newspec[Rec.OptKey(name)] = Any
             else:
-                newspec[Map.OptKey(name)] = newspec.pop(name)
+                newspec[Rec.OptKey(name)] = newspec.pop(name)
             names.add(name)
     # other args are required
     if argspec.args:
@@ -193,16 +193,16 @@ def class_to_dict_spec(cls):
         for name in argspec.kwonlyargs:
             if name not in names:
                 if argspec.kwonlydefaults and name in argspec.kwonlydefaults:
-                    newspec[Map.OptKey(name)] = Any
+                    newspec[Rec.OptKey(name)] = Any
                 else:
                     newspec[name] = Any
                 names.add(name)
     # *args and **kargs are optional
     if argspec.varargs and argspec.varargs not in names:
-        newspec[Map.OptKey(argspec.varargs)] = Any
+        newspec[Rec.OptKey(argspec.varargs)] = Any
     if argspec.varkw and argspec.varkw not in names:
-        newspec[Map.OptKey(argspec.varkw)] = Any
-    return (argspec.varargs, argspec.varkw, Map(_dict=newspec))
+        newspec[Rec.OptKey(argspec.varkw)] = Any
+    return (argspec.varargs, argspec.varkw, Rec(_dict=newspec))
 
 
 # decode starts w single spec/value.
@@ -219,13 +219,13 @@ def transcode(value, spec):
         if isinstance(value, Mapping):
             (varargs, varkw, dict_spec) = class_to_dict_spec(spec)
             new_value = transcode(value, dict_spec)
-            args = new_value.pop(Map.OptKey(varargs), []) if varargs else []
-            kargs = new_value.pop(Map.OptKey(varkw), {}) if varkw else {}
+            args = new_value.pop(Rec.OptKey(varargs), []) if varargs else []
+            kargs = new_value.pop(Rec.OptKey(varkw), {}) if varkw else {}
             args.extend(new_value.pop(index) 
                         for index in sorted(key 
                             for key in new_value.keys() 
-                            if isinstance(Map.OptKey.unpack(key), int)))
-            kargs.update((Map.OptKey.unpack(key), value) 
+                            if isinstance(Rec.OptKey.unpack(key), int)))
+            kargs.update((Rec.OptKey.unpack(key), value) 
                          for (key, value) in new_value.items())    
             return spec._abc_class(*args, **kargs)
         elif isinstance(value, spec):
@@ -234,12 +234,12 @@ def transcode(value, spec):
             type_error(value, spec)
     elif issubclass(spec, Seq):
         return list(spec._expand(value, lambda vsn: (transcode(v, s) for (v, s, n) in vsn)))
-    elif issubclass(spec, Map):
+    elif issubclass(spec, Rec):
         if spec._int_keys():
             return tuple(spec._expand(value, 
                         lambda vsn: (transcode(v, s) 
                                      for (v, s, n) in sorted(vsn, 
-                                                key=lambda vsn: Map.OptKey.unpack(vsn[2])))))
+                                                key=lambda vsn: Rec.OptKey.unpack(vsn[2])))))
         else:
             return dict(spec._expand(value, 
                         lambda vsn: ((n, transcode(v, s)) for (v, s, n) in vsn)))

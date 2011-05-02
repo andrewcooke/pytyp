@@ -1,9 +1,8 @@
 
-from abc import ABCMeta
 from collections import Sequence
 from unittest import TestCase
 
-from pytyp.spec.abcs import Seq, Map, Alt, Opt, Cls, normalize, Any, Delayed,\
+from pytyp.spec.abcs import Seq, Rec, Alt, Opt, Cls, normalize, Any, Delayed,\
     fmt, And, Atr, Or, transitive_ordered
 
 
@@ -32,7 +31,7 @@ class SeqTest(TestCase):
             def __len__(self):
                 return 42
         baz = Baz()
-        assert isinstance(baz, Sequence)
+        #assert isinstance(baz, Sequence)
         assert isinstance(baz, SFloat)
 
     def test_list(self):
@@ -79,7 +78,7 @@ class SeqTest(TestCase):
         boo = Boo(1,'two', 3.0)
         assert boo[1:] == ['two', 3.0]
         assert isinstance(boo, Seq)
-        assert isinstance(boo, Sequence)
+        #assert isinstance(boo, Sequence)
         assert not isinstance(boo, Seq(int))
         
     def test_is_subclass(self):
@@ -94,7 +93,7 @@ class SeqTest(TestCase):
         Seq(int).register_instance(foo)
         assert isinstance(foo, Seq(int))
         
-    def test_structural(self):
+    def test_seq_structural(self):
         assert isinstance([1,2,3], Seq(int))
         assert not isinstance(1, Seq(int))
         assert not isinstance([1,'two'], Seq(int))
@@ -120,40 +119,40 @@ class SeqTest(TestCase):
 class MapTest(TestCase):
     
     def test_subclass(self):
-        class Bar(dict, Map(a=int, b=str)): pass
+        class Bar(dict, Rec(a=int, b=str)): pass
         bar = Bar({'a':1, 'b':'two'})
         assert bar['a'] == 1
-        assert isinstance(bar, Map(a=int, b=str))
-        assert not isinstance(bar, Map(a=int, b=int))
-        assert isinstance({}, Map)
+        assert isinstance(bar, Rec(a=int, b=str))
+        assert not isinstance(bar, Rec(a=int, b=int))
+        assert isinstance({}, Rec)
         
     def test_register(self):
         class Baz(): pass
         baz = Baz()
-        assert not isinstance(baz, Map(a=int, b=str))
-        Map(a=int, b=str).register_instance(baz)
-        assert isinstance(baz, Map(a=int, b=str))
+        assert not isinstance(baz, Rec(a=int, b=str))
+        Rec(a=int, b=str).register_instance(baz)
+        assert isinstance(baz, Rec(a=int, b=str))
         
     def test_structural(self):
-        assert isinstance({'a': 1}, Map(a=int))
-        assert not isinstance(1, Map(a=int))
-        assert not isinstance({'a': 1, 'b': 2}, Map(a=int))
-        assert not isinstance({'a': 'one'}, Map(a=int))
-        assert isinstance({'a': 1, 'b': 'two'}, Map(a=int,b=str))
+        assert isinstance({'a': 1}, Rec(a=int))
+        assert not isinstance(1, Rec(a=int))
+        assert not isinstance({'a': 1, 'b': 2}, Rec(a=int))
+        assert not isinstance({'a': 'one'}, Rec(a=int))
+        assert isinstance({'a': 1, 'b': 'two'}, Rec(a=int,b=str))
         try:
             assert isinstance({'a': 1, 'b': 'two'}, {'a':int,'b':str})
             assert False, 'Expected error'
         except TypeError as e:
             assert 'must be a type' in str(e), e
-        assert isinstance({'a': 1, 'b': 'two'}, Map(a=int,__b=str))
-        assert isinstance({'a': 1}, Map(a=int,__b=str))
-        assert isinstance([1, 'two'], Map(int,str))
-        assert not isinstance([1, 2], Map(int,str))
+        assert isinstance({'a': 1, 'b': 'two'}, Rec(a=int,__b=str))
+        assert isinstance({'a': 1}, Rec(a=int,__b=str))
+        assert isinstance([1, 'two'], Rec(int,str))
+        assert not isinstance([1, 2], Rec(int,str))
         
         
 class AltTest(TestCase):
     
-    def test_subclass(self):
+    def test_alt_subclass(self):
         class Bar(Alt(int, str)): pass
         bar = Bar()
         assert isinstance(bar, Alt(int, str))

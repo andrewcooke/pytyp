@@ -644,8 +644,8 @@ Named Tuples
 
 Named tuples are interesting because they so closely correspond to product
 types.  Yet they are "bolted on" to the language and do not support type
-annotations.  They also, confusingly, relate a ``Map()`` over integer keys to
-one over names; more useful would be a relationship between ``Map()`` and
+annotations.  They also, confusingly, relate a ``Rec()`` over integer keys to
+one over names; more useful would be a relationship between ``Rec()`` and
 ``Atr()`` using the same names — ``pytyp`` provides ``record()`` for this.
 
 ABC Granularity
@@ -793,11 +793,11 @@ values make certain names optional)::
    name, and unlikely to clash with existing code.
 
 To avoid syntax–related restrictions, ``Rec()`` can take a ``dict`` as a
-direct argument, via the ``_dict`` parameter, and then ``Map.­Opt­Key()`` can
+direct argument, via the ``_dict`` parameter, and then ``Rec.­Opt­Key()`` can
 mark optional records::
 
     >>> isinstance({1:1}, 
-    ...            Rec(_dict={1:int, Map.OptKey(2):str}))
+    ...            Rec(_dict={1:int, Rec.OptKey(2):str}))
     True
 
 Class Shorthand

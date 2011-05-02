@@ -29,7 +29,7 @@
 from unittest import TestCase
 from collections import namedtuple
 
-from pytyp.spec.abcs import Opt, Alt, Any, Map
+from pytyp.spec.abcs import Opt, Alt, Any, Rec
 from pytyp.spec.check import verify
 from pytyp._test.support import SimpleArgs
 
@@ -106,10 +106,10 @@ class verifyTest(TestCase):
         
     def test_product(self):
         verify({'a': 1, 'b': 'two'}, {'a': int, 'b': str})
-        verify({'a': 1, 'b': 'two'}, Map(a=int, b=str))
+        verify({'a': 1, 'b': 'two'}, Rec(a=int, b=str))
         verify((1, 'two'), {0: int, 1: str})
-        verify((1, 'two'), Map(int, str))
+        verify((1, 'two'), Rec(int, str))
         verify([1, 'two'], {0: int, 1: str})
-        verify([1, 'two'], Map(int, str))
+        verify([1, 'two'], Rec(int, str))
 
         

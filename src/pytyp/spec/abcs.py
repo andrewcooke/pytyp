@@ -1,36 +1,49 @@
 
-from abc import ABCMeta
-from collections import Sequence, Mapping, ByteString, MutableSequence, MutableMapping
+from abc import ABCMeta, abstractmethod
+from collections import Sequence, Mapping, ByteString, MutableSequence, MutableMapping, \
+    Container
 from functools import wraps
 from itertools import count
 from numbers import Number
 from reprlib import recursive_repr, get_ident
-from time import time
 from weakref import WeakSet, WeakKeyDictionary
 
 from pytyp.util import items
 
 
-class Atomic(metaclass=ABCMeta): pass
+class TypeSpecMeta(ABCMeta):
+    
+    def __instancecheck__(cls, instance):
+        try:
+            # if false may still be subclass
+            if cls.__instancehook__(instance): 
+                return True
+        except AttributeError:
+            pass
+        return super().__instancecheck__(instance)
+    
+    
+class TypeSpec(metaclass=TypeSpecMeta):
 
+    @classmethod
+    def _structuralcheck(cls, instance):
+        return cls._expand(instance, cls._verify)
+    
+
+class Atomic(metaclass=ABCMeta):
+    '''
+    These are (normal) types that should not be normalised.
+    '''
+    
 Atomic.register(Number)
 Atomic.register(ByteString)
 Atomic.register(str)
 Atomic.register(bool)
 
 
-class Normalized(metaclass=ABCMeta):
+class NoStructural(metaclass=ABCMeta): pass
 
-    @staticmethod
-    def is_normalized(cls):
-        return Normalized in cls.__bases__
-    
-    @classmethod
-    def _structuralcheck(cls, instance):
-        return cls._expand(instance, cls._verify)
-    
-    
-class Registered(metaclass=ABCMeta): pass
+class NoNormalize(): pass
 
 
 class RecursiveType(TypeError):
@@ -63,21 +76,21 @@ def make_recursive_block(make_key=lambda args: id(args[0]),
     return recursive_block
 
 
-block_instancehook = make_recursive_block(lambda args: (id(args[0]), id(args[1])), 
-                                           lambda _: RecursiveType.throw())
+block_recursive_type = make_recursive_block(lambda args: (id(args[0]), id(args[1])), 
+                                            lambda _: RecursiveType.throw())
 
 
 @make_recursive_block()
 def normalize(spec):
     '''
-    >>> fmt(normalize(Map(a=int)))
-    'Map(a=int)'
+    >>> fmt(normalize(Rec(a=int)))
+    'Rec(a=int)'
     >>> fmt(normalize({'a': int}))
-    'Map(a=int)'
+    'Rec(a=int)'
     >>> fmt(normalize((int, str)))
-    'Map(0=int,1=str)'
-    >>> fmt(normalize(Map((int,), {'a':str})))
-    'Map(0=Map(0=int),1=Map(a=str))'
+    'Rec(0=int,1=str)'
+    >>> fmt(normalize(Rec((int,), {'a':str})))
+    'Rec(0=Rec(0=int),1=Rec(a=str))'
     >>> fmt(normalize([int]))
     'Seq(int)'
     >>> fmt(normalize([]))
@@ -96,7 +109,7 @@ def normalize(spec):
     >>> fmt(normalize(Opt([int])))
     'Opt(Seq(int))'
     >>> fmt([int, str])
-    'Map(0=int,1=str)'
+    'Rec(0=int,1=str)'
     '''
     if isinstance(spec, list):
         if not spec:
@@ -104,18 +117,18 @@ def normalize(spec):
         if len(spec) == 1:
             return Seq(normalize(spec[0]))
         else:
-            return Map(*map(normalize, spec))
+            return Rec(*map(normalize, spec))
     elif isinstance(spec, dict):
-        return Map(_dict=dict((name, normalize(spec[name])) for name in spec))
+        return Rec(_dict=dict((name, normalize(spec[name])) for name in spec))
     elif isinstance(spec, tuple):
-        return Map(*tuple(normalize(s) for s in spec))
+        return Rec(*tuple(normalize(s) for s in spec))
     elif isinstance(spec, type):
         if issubclass(spec, Delayed):
             spec._spec = normalize(spec._spec)
             return spec
         elif issubclass(spec, Atomic):
             return spec
-        elif Normalized.is_normalized(spec):
+        elif NoNormalize in spec.__bases__:
             return spec
         else:
             return Cls(spec)
@@ -167,22 +180,22 @@ def _polymorphic_subclass(abc, args, kargs, _normalize=None):
             cls._abc_instance_registry.add(instance)
             
         @classmethod
-        @block_instancehook
+        @block_recursive_type
         def __instancehook__(cls, instance):
             try:
                 if instance in cls._abc_instance_registry:
                     return True
             except TypeError: # unhashable
                 pass
-            # only do structural check for classes that are not already registered
+            # only do structural check for classes that are not already subclasses
             # or we get confusing results with empty containers (and slower code)
-            if not isinstance(instance, Registered):
+            if not isinstance(instance, NoStructural):
                 return cls._structuralcheck(instance)
                 
         # replaced a standard class definition with this to help with debugging
         # as it was confusing when everything had the same name
-        subclass = type(abc)(abc.__name__ + '_' + str(abs(hash(types))),
-                             (abc, Normalized, Registered),
+        subclass = type(abc)(abc.__name__ + '_' + str(abs(hash(types))), 
+                             (abc, NoStructural, NoNormalize),
                              {'_abc_type_arguments': types,
                               '_abc_instance_registry': WeakSet(),
                               'register_instance': register_instance,
@@ -221,9 +234,13 @@ class Sum:
         return False
     
 
-class Seq(Sequence, Product, Normalized):
+class Seq(Product, TypeSpec, NoNormalize):
     
     _abc_polymorphic_cache = {}
+    
+    @abstractmethod
+    def __getitem__(self, index):
+        raise IndexError
     
     def __new__(cls, *args, _normalize=normalize, **kargs):
         if cls is Seq: # check args only when being used as a class factory
@@ -251,8 +268,8 @@ class Seq(Sequence, Product, Normalized):
         except AttributeError:
             return 'Seq'
 
-
-class Map(Mapping, Product, Normalized):
+    
+class Rec(Product, TypeSpec, NoNormalize):
     
     _abc_polymorphic_cache = {}
     
@@ -266,7 +283,7 @@ class Map(Mapping, Product, Normalized):
             
         @staticmethod
         def unpack(name):
-            if isinstance(name, Map.OptKey):
+            if isinstance(name, Rec.OptKey):
                 return name.name
             else:
                 return name
@@ -275,7 +292,7 @@ class Map(Mapping, Product, Normalized):
         def decode(name):
             try:
                 if name.startswith('__'):
-                    return Map.OptKey(name[2:])
+                    return Rec.OptKey(name[2:])
             except AttributeError:
                 pass
             return name
@@ -290,12 +307,16 @@ class Map(Mapping, Product, Normalized):
         def __hash__(self): return hash(str(self))
         def __str__(self): return '__' +  str(self.name)
 
+    @abstractmethod
+    def __getitem__(self, index):
+        raise IndexError
+
     def __new__(cls, *args, _normalize=normalize, _dict=None, **kargs):
-        if cls is Map: # check args only when being used as a class factory
+        if cls is Rec: # check args only when being used as a class factory
             if _dict: kargs.update(_dict) 
             if (kargs and args) or (not args and not kargs):
                 raise TypeError('Map requires named or unnamed arguments, but not both')
-            kargs = dict((Map.OptKey.decode(name), arg) for (name, arg) in kargs.items())
+            kargs = dict((Rec.OptKey.decode(name), arg) for (name, arg) in kargs.items())
             return _polymorphic_subclass(cls, args, kargs, _normalize=_normalize)
         else:
             return super().__new__(cls, *args, **kargs)
@@ -311,11 +332,11 @@ class Map(Mapping, Product, Normalized):
                 names = set(names)
                 # drop existing and optional names
                 for (name, spec) in cls._abc_type_arguments:
-                    unpacked = Map.OptKey.unpack(name)
+                    unpacked = Rec.OptKey.unpack(name)
                     try:
                         yield (value[unpacked], spec, name)
                     except KeyError:
-                        if not isinstance(name, Map.OptKey):
+                        if not isinstance(name, Rec.OptKey):
                             raise TypeError('Missing value for {0}'.format(name))
                     names.discard(unpacked)
                 if names:
@@ -328,24 +349,28 @@ class Map(Mapping, Product, Normalized):
     @classmethod
     def _int_keys(cls):
         for (name, _) in cls._abc_type_arguments:
-            if not isinstance(Map.OptKey.unpack(name), int):
+            if not isinstance(Rec.OptKey.unpack(name), int):
                 return False
         return True
 
     @classmethod
     def _fmt(cls):
         try:
-            return 'Map({0})'.format(
+            return 'Rec({0})'.format(
                         ','.join('{0}={1}'.format(name, fmt(spec))
                                  for (name, spec) in cls._abc_type_arguments))
         except AttributeError:
             return 'Map'
 
 
-class Atr(Product, Normalized):
+class Atr(Product, TypeSpec, NoNormalize):
     
     _abc_polymorphic_cache = {}
     
+    @abstractmethod
+    def __getattr__(self, key):
+        raise KeyError
+
     def __new__(cls, *args, _normalize=normalize, _dict=None, **kargs):
         if cls is Atr: # check args only when being used as a class factory
             if _dict: kargs.update(_dict) 
@@ -380,7 +405,7 @@ class Atr(Product, Normalized):
             return 'Atr'
 
 
-class Alt(Sum, Normalized, metaclass=ABCMeta):
+class Alt(Sum, TypeSpec, NoNormalize):
     
     # this makes no sense as a mixin - it exists only to specialise the 
     # functionality provided by the Polymorphic factory above (ie to hold 
@@ -425,7 +450,7 @@ class Alt(Sum, Normalized, metaclass=ABCMeta):
         raise TypeError('Cannot dispatch {0} on {1}'.format(value, fmt(cls)))
 
 
-class Opt(Alt, Normalized):
+class Opt(Alt, NoNormalize):
     
     # defining this as a subclass of Alt, rather than simple function that calls
     # Alt just gives a nicer formatting
@@ -456,7 +481,7 @@ class Cls:
 
             # TODO - convert to call to type with name
 
-            class __Cls(Cls, Normalized, metaclass=ABCMeta):
+            class __Cls(Cls, TypeSpec, NoNormalize):
                 
                 _abc_polymorphic_cache = {}
                 _abc_class = class_
@@ -503,7 +528,7 @@ def transitive_ordered(args, cls):
     return sorted(expand(args, set()), key=id)
 
 
-class _Set(Normalized):
+class _Set(TypeSpec):
     
     def __new__(cls, *args, _normalize=normalize, **kargs):
         if _Set in cls.__bases__: # check args only when being used as a class factory
@@ -529,7 +554,7 @@ class _Set(Normalized):
         
     @classmethod
     def __subclasshook__(cls, subclass):
-        if _Set in cls.__bases__:
+        if _Set is cls or _Set in cls.__bases__:
             return NotImplemented
         else:
             return cls._expand(subclass, lambda vsn: cls._verify(vsn, check=issubclass))
@@ -554,7 +579,7 @@ class Or(Sum, _Set):
     _abc_polymorphic_cache = {}
     
 
-class Delayed(metaclass=ABCMeta):
+class Delayed(metaclass=TypeSpecMeta):
     
     _count = 0
     
@@ -585,7 +610,7 @@ class Delayed(metaclass=ABCMeta):
         return cls.get().register_instance(instance)
         
     @classmethod
-    @block_instancehook
+    @block_recursive_type
     def __instancehook__(cls, instance):
         return cls.get().__instancehook__(instance)
         
@@ -605,29 +630,15 @@ class Delayed(metaclass=ABCMeta):
     @classmethod
     def _on(cls, value, **choices):
         return cls.get()._on(value, **choices)
-    
-    
-PYTYP_PATCHED = 'pytyp_patched'
 
-if not hasattr(ABCMeta, PYTYP_PATCHED):
 
-    instance_check = ABCMeta.__instancecheck__
-    def replacement_instancecheck(cls, instance):
-        try:
-            result = cls.__instancehook__(instance)
-            if result: # if false may still be subclass
-                return result
-        except AttributeError:
-            pass
-        return instance_check(cls, instance)
+Container.register(Seq)
+Seq.register(Sequence)
+Seq.register(MutableSequence)
 
-    ABCMeta.__instancecheck__ = replacement_instancecheck
-    setattr(ABCMeta, PYTYP_PATCHED, time())
-
-    for s in MutableSequence._abc_registry:
-        Seq.register(s)
-    for m in MutableMapping._abc_registry:
-        Map.register(m)
+Container.register(Rec)
+Rec.register(Mapping)
+Rec.register(MutableMapping)
 
 
 if __name__ == "__main__":

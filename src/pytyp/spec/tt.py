@@ -1,10 +1,8 @@
 
-from abc import ABCMeta
-from collections import _iskeyword, namedtuple
-from itertools import chain, permutations
+from collections import _iskeyword
 from string import whitespace
 
-from pytyp.spec.abcs import And, Cls, Map
+from pytyp.spec.abcs import And, Cls, Rec
 from pytyp.spec.check import checked as _checked
 
 
@@ -14,7 +12,7 @@ def record(typename, field_names, verbose=False, rename=False, mutable=False,
     nds = validate_args(parse_args(field_names), rename=rename)
     template = class_template(typename, list(nds), mutable, checked, private)
     if verbose: print(template)
-    namespace = dict(property=property, checked=_checked, And=And, Cls=Cls, Map=Map)
+    namespace = dict(property=property, checked=_checked, And=And, Cls=Cls, Rec=Rec)
     try:
         exec(template, namespace)
     except SyntaxError as e:
@@ -33,7 +31,7 @@ def class_template(typename, nds, mutable, checked, private):
                          for (name, _, _) in nds)
     properties = '\n'.join(map(pad4, fmt_properties(nds, _dict, mutable, checked)))
     return '''
-class {typename}(object, And(Cls(Map,{args_spec}),Map({args_spec}))):
+class {typename}(Cls(Rec,{args_spec})):
     """record {typename}:
 {class_doc}"""
     {checked}
@@ -89,6 +87,9 @@ def parse_args(args):
     >>> list(parse_args('a=[1,2]:Seq(int) b=3'))
     [('a', '[1,2]', 'Seq(int)'), ('b', '3', 'Any')]
     >>> list(parse_args('a:Seq({x:y) b, c:foo'))
+    Traceback (most recent call last):
+      ...
+    ValueError: Cannot parse a:None:Seq({x:y) b, c:foo
     '''
     open_to_close = {'(': ')', '[': ']', '{': '}', '"': '"', "'": "'"}
     parens, words, default = [], [''], False
@@ -121,7 +122,7 @@ def parse_args(args):
             elif gap_state == GAP:
                 if len(words) == 1: words.append(None)
                 if len(words) == 2: words.append('Any')
-                yield words
+                yield tuple(words)
                 words, default, gap_state = [c], False, NO
             elif c in open_to_close:
                 parens.append(c)
@@ -135,7 +136,7 @@ def parse_args(args):
     elif words[0]:
         if len(words) == 1: words.append(None)
         if len(words) == 2: words.append('Any')
-        yield words
+        yield tuple(words)
         
 
 def validate_args(args, rename=False):

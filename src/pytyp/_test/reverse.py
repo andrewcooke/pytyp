@@ -31,7 +31,7 @@ from inspect import formatargspec, getfullargspec
 
 from pytyp._test.support import SimpleArgs, TypedArgs, NamedArgs
 from abc import abstractmethod, ABCMeta
-from collections import namedtuple
+from collections import namedtuple, Sequence
 
 
 class ReverseTest(TestCase):
@@ -138,6 +138,30 @@ class ReverseTest(TestCase):
         assert bar(2) == ((2,), {}), bar(2)
         assert bar(2,b=3) == ((2,), {'b':3}), bar(2,b=3)
         
+        
+    def test_inheritance(self):
+        class NewABCMeta(ABCMeta):
+            def foo(self): return 42
+        class MyList(list,metaclass=NewABCMeta):
+            pass
+        mylist = MyList([1,2,3])
+        assert mylist.__class__.foo() == 42
+        class MyList2(list,Sequence,metaclass=NewABCMeta):
+            pass
+        MyList2([1,2,3])
+        MyList.register(MyList2)
+        try:
+            class MyList3(list,NewABCMeta):
+                pass
+            assert False, 'expected error'
+        except TypeError:
+            pass
+        try:
+            class MyList4(NewABCMeta,list):
+                pass
+            assert False, 'expected error'
+        except TypeError:
+            pass
 
 
 def mustbe(n):

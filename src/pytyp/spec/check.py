@@ -23,14 +23,14 @@ def checked(func):
       >>> str_len([1,2,3])
       Traceback (most recent call last):
         ...
-      TypeError: Value [1, 2, 3] inconsistent with type str.
+      TypeError: Type str inconsistent with [1, 2, 3].
       >>> @checked
       ... def bad_len(s:str) -> int:
       ...     return 'wrong'
       >>> bad_len('abc')
       Traceback (most recent call last):
         ...
-      TypeError: Value 'wrong' inconsistent with type int.
+      TypeError: Type int inconsistent with 'wrong'.
     '''
     @wraps(func)
     def wrapper(*args, **kargs):

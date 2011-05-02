@@ -4,7 +4,7 @@ from collections import Sequence
 from unittest import TestCase
 
 from pytyp.spec.abcs import Seq, Map, Alt, Opt, Cls, normalize, Any, Delayed,\
-    fmt
+    fmt, And, Atr, Or, transitive_ordered
 
 
 class SeqTest(TestCase):
@@ -203,37 +203,78 @@ class ClsTest(TestCase):
     
     def test_class_register(self):
         class Bar: pass
-        bar = Bar()
         class Baz: pass
-        baz = Baz()
-        assert not isinstance(bar, Cls(Bar, int))
-        assert not isinstance(baz, Cls(Baz, int))
-        Cls(Bar, int).register_instance(bar)
-        assert isinstance(bar, Cls(Bar, int))
-        assert not isinstance(baz, Cls(Bar, int))
-        assert not isinstance(baz, Cls(Baz, int))
-        Cls(Baz, int).register_instance(baz)
-        assert isinstance(bar, Cls(Bar, int))
-        assert not isinstance(baz, Cls(Bar, int))
-        assert isinstance(baz, Cls(Baz, int))
+        bar = Bar()
+        assert not isinstance(bar, Cls(Baz))
+        Cls(Baz).register_instance(bar)
+        assert isinstance(bar, Cls(Baz))
+
+    def test_structural(self):
+        class Bar: pass
+        bar = Bar()
+        assert isinstance(bar, Cls(Bar))
+        
+    def test_inheritance(self):
+        assert issubclass(Cls(int), Cls)
+        
+        
+class AndTest(TestCase):
     
+    def test_and_register(self):
+        class Bar: pass
+        class Baz: pass
+        bar = Bar()
+        baz = Baz()
+        assert not isinstance(bar, And(Bar, Atr(a=int)))
+        assert not isinstance(baz, And(Baz, Atr(a=int)))
+        And(Bar, Atr(a=int)).register_instance(bar)
+        assert isinstance(bar, And(Bar, Atr(a=int)))
+        assert not isinstance(baz, And(Bar, Atr(a=int)))
+        assert not isinstance(baz, And(Baz, Atr(a=int)))
+        And(Baz, Atr(a=int)).register_instance(baz)
+        assert isinstance(bar, And(Bar, Atr(a=int)))
+        assert not isinstance(baz, And(Bar, Atr(a=int)))
+        assert isinstance(baz, And(Baz, Atr(a=int)))
+        
     def test_structural(self):
         class Foo:
             def __init__(self, x):
                 self.x = x
         ifoo = Foo(1)
         sfoo = Foo('one')
-        assert isinstance(ifoo, Cls(Foo))
+        assert isinstance(ifoo, Foo)
         assert isinstance(sfoo, Cls(Foo))
-        assert isinstance(ifoo, Cls(Foo, x=int))
-        assert not isinstance(sfoo, Cls(Foo, x=int))
-
-    def test_inheritance(self):
-        assert issubclass(Cls(int), Cls)
+        assert isinstance(ifoo, And(Foo, Atr(x=int)))
+        assert not isinstance(sfoo, And(Foo, Atr(x=int)))
         
+        assert not issubclass(int, And(int, str))
+        
+        assert isinstance(ifoo, Cls(Foo, x=int))
+        
+        
+class OrTest(TestCase):
+    
+    def test_or_structural(self):
+        assert isinstance(1, Or(int, str))
+        assert isinstance('one', Or(int, str))
+        assert not isinstance(1.0, Or(int, str))
+        
+        assert issubclass(int, Or(int, str))
+        assert issubclass(str, Or(int, str))
+        assert not issubclass(float, Or(int, str))
+        
+        assert issubclass(int, Or(Atr(a=str), int))
+
         
 class AnyTest(TestCase):
     
     def test_int(self):
         assert isinstance(1, Any)
         
+
+class OrderTest(TestCase):
+    
+    def test_order(self):
+        ordered = transitive_ordered([int, And(str, float)], And)
+        assert len(ordered) == 3, ordered
+    

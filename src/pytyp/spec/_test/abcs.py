@@ -2,8 +2,7 @@
 from collections import Sequence
 from unittest import TestCase
 
-from pytyp.spec.abcs import Seq, Rec, Alt, Opt, Cls, normalize, Any, Delayed,\
-    fmt, And, Atr, Or, transitive_ordered
+from pytyp.spec.abcs import Seq, Rec, Alt, Opt, Cls, Any, Delayed, And, Atr, Or
 
 
 class SeqTest(TestCase):
@@ -21,7 +20,7 @@ class SeqTest(TestCase):
         sint = Seq(int)
         sfloat = Seq(float)
         assert sint is not sfloat
-        assert sint._abc_type_arguments == ((0, int),), sint._abc_type_arguments
+        assert sint._abc_type_arguments == ((0, Cls(int)),), sint._abc_type_arguments
         
     def test_mixin(self):
         SFloat = Seq(float)
@@ -42,6 +41,10 @@ class SeqTest(TestCase):
         assert isinstance(bar, list)
         assert bar[1:] == [2,3], bar[1:]
         assert not isinstance(bar, Seq(float))
+        
+        assert issubclass(Bar, Seq)
+        assert not issubclass(Bar, Seq(str))
+        assert issubclass(Bar, Seq(int))
 
     def test_subclass(self):
         class Boo(list, Seq):
@@ -93,6 +96,12 @@ class SeqTest(TestCase):
         Seq(int).register_instance(foo)
         assert isinstance(foo, Seq(int))
         
+        assert not issubclass(Foo, Seq(int))
+        Seq(int).register(Foo)
+        assert not issubclass(Foo, Seq(str))
+        assert issubclass(Foo, Seq(int))
+        assert issubclass(Foo, Seq)
+        
     def test_seq_structural(self):
         assert isinstance([1,2,3], Seq(int))
         assert not isinstance(1, Seq(int))
@@ -104,7 +113,7 @@ class SeqTest(TestCase):
         d = Delayed()
         d2 = Alt(int, d, str)
         d.set(d2)
-        assert fmt(d) == 'Delayed(Alt(0=int,1=...,2=str))', fmt(d)
+        assert repr(d) == 'Delayed(Alt(0=int,1=...,2=str))', repr(d)
         assert isinstance(1, d)
         assert isinstance('two', d)
         
@@ -125,6 +134,10 @@ class MapTest(TestCase):
         assert isinstance(bar, Rec(a=int, b=str))
         assert not isinstance(bar, Rec(a=int, b=int))
         assert isinstance({}, Rec)
+        
+        assert issubclass(Bar, Rec)
+        assert not issubclass(Bar, Rec(a=int, b=float))
+        assert issubclass(Bar, Rec(a=int, b=str))
         
     def test_register(self):
         class Baz(): pass
@@ -169,6 +182,15 @@ class AltTest(TestCase):
         assert isinstance('one', Alt(int, str))
         assert isinstance(1, Alt(int, str))
         assert not isinstance(1.0, Alt(int, str))
+        
+        assert not issubclass(float, Alt(int, str))
+        assert issubclass(int, Alt(int, str))
+        assert issubclass(str, Alt(int, str))
+        
+        assert not issubclass(type, Alt)
+        assert not issubclass(int, Alt)
+        assert issubclass(Alt, Alt)
+        assert issubclass(Opt, Alt)
 
 
 class OptTest(TestCase):
@@ -189,8 +211,8 @@ class OptTest(TestCase):
         assert isinstance(baz, Opt(int))
         
     def test_normalize(self):
-        foo = normalize(Opt([int]))
-        assert foo == Alt(none=None, value=Seq(int)), fmt(foo)
+        foo = Opt([int])
+        assert foo == Alt(none=None, value=Seq(int)), repr(foo)
         
     def test_structural(self):
         assert isinstance(None, Opt(int))
@@ -207,6 +229,12 @@ class ClsTest(TestCase):
         assert not isinstance(bar, Cls(Baz))
         Cls(Baz).register_instance(bar)
         assert isinstance(bar, Cls(Baz))
+        
+        assert issubclass(Bar, Cls(Bar))
+        assert not issubclass(Baz, Cls(Bar))
+        Cls(Bar).register(Baz)
+        assert issubclass(Baz, Cls(Bar))
+        
 
     def test_structural(self):
         class Bar: pass
@@ -215,6 +243,8 @@ class ClsTest(TestCase):
         
     def test_inheritance(self):
         assert issubclass(Cls(int), Cls)
+        assert issubclass(int, Cls(int))
+        assert not issubclass(int, Cls)
         
         
 class AndTest(TestCase):
@@ -258,9 +288,9 @@ class OrTest(TestCase):
         assert isinstance('one', Or(int, str))
         assert not isinstance(1.0, Or(int, str))
         
+        assert not issubclass(float, Or(int, str))
         assert issubclass(int, Or(int, str))
         assert issubclass(str, Or(int, str))
-        assert not issubclass(float, Or(int, str))
         
         assert issubclass(int, Or(Atr(a=str), int))
 
@@ -274,6 +304,6 @@ class AnyTest(TestCase):
 class OrderTest(TestCase):
     
     def test_order(self):
-        ordered = transitive_ordered([int, And(str, float)], And)
+        ordered = And.transitive_ordered([int, And(str, float)])
         assert len(ordered) == 3, ordered
     

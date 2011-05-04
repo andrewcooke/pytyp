@@ -31,7 +31,6 @@ from unittest import TestCase
 from pytyp.s11n.base import encode, decode
 from pytyp._test.support import SimpleArgs, NamedArgs, ArgsAndKArgs,\
     MissingKArgs, TypedKArgs
-from pytyp.spec.abcs import fmt
 
 
 class RoundtripTest(TestCase):

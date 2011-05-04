@@ -54,6 +54,8 @@ specifications.
 Introduction
 ------------
 
+TODO - Seq is really Iterable!
+
 This paper started as an attempt to answer questions raised by a JSON library
 using function annotations.  It took on a life of its own.  When it settled,
 eventually, in a consistent approach, I rewrote the library to match.
@@ -173,7 +175,7 @@ duck types [#]_::
 Instead, ``MyExample`` must either subclass ``MyAbc`` or register itself
 (populating a lookup table used by ``isinstance()``).  **The ABC acts only as
 a marker that signals the veracity of the registered (or subclass) type; it
-does not perform a runtime check of the attributes [#]_**.
+does not perform a runtime check of the attributes** [#]_.
 
 .. [#] This isn't completely true; when used with inheritance it is possible
    for ABCs to define abstract methods, which concrete implementations must
@@ -418,37 +420,73 @@ custom classes.
 The ``Pytyp`` Library
 ---------------------
 
-Approach
-~~~~~~~~
-
 The previous sections explored a variety of ideas.  Now I will describe the
-``pytyp`` library.  This supports two general uses, identified in `Semantics`_
-above: verification and expansion.
-
-Two approaches to verification have been discussed: registering with ABCs is
-efficient, but restricted to hashable instances; a structural approach allows the
-library to also work with Python's common, mutable data structures.  ``Pytyp``
-supports both.
+``pytyp`` library.
 
 ABCs
 ~~~~
 
-We add parametric polymorphism by creating subclasses to contain the extra
-type information.  So, hypothetically, ``Sequence(int)`` would create (or
-retrieve from a cache, if it already exists) a subclass of the existing ABC
-``Sequence``, parameterised by ``int``, which would support both subclassing
-and registration.
+Construction and Inheritance
+............................
 
+Embedding type specifications within the language leads to a problem [#]_: if
+the subclass relation is transitive then we cannot test for the types of type
+specifications.  Consider the following::
+
+   >>> issubclass(Cls(X), Cls)
+   True
+   >>> issubclass(X, Cls(X))
+   True
+   >>> issubclass(X, Cls)
+   ?
+
+.. [#] This can be seen as a consequence of excluding a conceptual layer
+   between classes and instances with a corresponding ``istypespec()``.  The
+   approach used here allows easier integration with existing code.
+
+Traditionally, the final value would be ``True`` for any value of X, including
+``type`` itself.  But this will cause problems when client code is checking
+the type of a specification to dispatch some operation.
+
+In other words, there is a conflict between "is ``X`` a type within the type
+specification ``Y``?" and "is ``X`` a type specification of type ``Y``?"
+
+To address this the library has the following structure:
+
+* **Type Specification Constructors** (eg. ``Cls``, ``Seq``) are ordinary
+  classes whose ``__new__`` methods act as factories for type specifications.
+
+* **Type Specifications** (eg. ``Cls(X)``, ``Seq()``) are [#]_ dynamically
+  created classes, cached in the type constructor by the type arguments, that
+  have a ``TSMeta`` metaclass.
+
+* **Type Specification Metaclass** (``TSMeta``) is a subclass of ``ABCMeta``
+  that extends registration to include instances, adds expansion and
+  structural verification, etc.
+
+Returning to the example above: ``issubclass(X, Cls)`` asks if ``X`` is a
+subclass of the ``Cls`` constructor; ``issubclass(X, Cls())`` asks if ``X`` is
+described by the specification ``Cls()`` [#]_.  The first is resolved using
+normal Python subclassing; the second includes modified logic from ``TSMeta``.
+Since only the latter includes arbitrary types we lose the unwanted
+transitivity.
+
+.. [#] More exactly, "return".
+.. [#] ``Cls()`` is equivalent to ``Cls(type)``, so the result is ``True``.
+
+This solution does not address the case where a type specification is
+subclassed, but those will be proper subclasses that are unlikely to be
+confusing during dispatch by type.
+   
 Class Hierarchy
 ...............
 
-In practice, because ``pytyp`` is a library, we cannot modify existing ABCs
-directly [#]_, leading to an additional level of classes.
+In practice, because ``pytyp`` is a library, we cannot modify existing ABCs.
+Instead, ``pytyp`` introduces a new class hierarchy, based on
+``TypeSpecMeta``, which is a subclass of ``ABCMeta``.  This hierarchy is
+"patched in" to the existing ABCs using registration.
 
-.. [#] It would be possible for the library to define a completely new set of
-   ABCs, but this would make it harder to integrate with existing code.
-
-So ``Seq`` subclasses ``Sequence`` and ``Seq(int)`` creates a subclass of
+So ``Seq`` IS SOMETHING TO ``Sequence`` and ``Seq(int)`` creates a subclass of
 ``Seq`` specialised to represent ``int`` sequences, which can itself be
 subclassed::
 
@@ -460,12 +498,16 @@ subclassed::
     >>> isinstance(MyIntList(), Seq(float))
     False
 
+CORRECT THIS.
+
 Also, ``Record`` and ``MutableRecord`` are introduced as subclasses of
 ``Collection``, adding ``__getitem__()`` and ``__set­item__()``, respectively.
 ``Sequence``, ``Rec``, etc. are then registered with these.
 
 Registration
 ............
+
+CORRECT THIS.
 
 We must extend registration to include instances.  This implies an extra cache
 in the ABCs and a modification to the code that implements ``isinstance()``.
@@ -686,6 +728,8 @@ here, but something feels wrong.
 Expansion Through Metaclasses
 .............................
 
+FIX
+
 Metaclasses are very powerful, but they are difficult to extend when "frozen
 in" to the existing class hierarchy (ie. if you replace ABCMeta you have to
 re–implement at least the ``abc`` package).  This would be less of an issue if
@@ -712,6 +756,11 @@ simplified by allowing arbitrary tags on (all) values?  Is there a need for an
 intermediate conceptual level, between instances and types, that is somehow
 related to state?  Are there useful parallels between type verification and
 the "unexpected path" handling of a JIT compiler?
+
+Efficiency
+~~~~~~~~~~
+
+Location within call chain, relationship w -ve cache.
 
 Inheritance, Inconsistencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

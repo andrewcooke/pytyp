@@ -162,6 +162,24 @@ class ReverseTest(TestCase):
             assert False, 'expected error'
         except TypeError:
             pass
+        
+    def test_inheritance_2(self):
+        class Const: pass
+        class Spec(Const, metaclass=ABCMeta): pass
+        assert not issubclass(int, Const)
+        assert not issubclass(int, Spec)
+        Spec.register(int) 
+        assert not issubclass(int, Const)
+        assert issubclass(int, Spec)
+        assert not issubclass(int, Const)
+        
+        class BadConst(metaclass=ABCMeta): pass
+        class BadSpec(BadConst): pass
+        assert not issubclass(int, BadConst)
+        assert not issubclass(int, BadSpec)
+        BadSpec.register(int) 
+        assert issubclass(int, BadConst) # not what we want
+        assert issubclass(int, BadSpec)
 
 
 def mustbe(n):

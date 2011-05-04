@@ -28,8 +28,8 @@
 
 from inspect import getfullargspec, getcallargs
 from collections import Callable, Iterable, Mapping
-from pytyp.spec.abcs import expand, Atomic, Any, Rec, Seq, Cls, normalize,\
-    type_error, Alt
+from pytyp.spec.abcs import Atomic, Any, Rec, Seq, Cls, type_error, Alt,\
+    TypeSpecMeta
 
 
 def encode(obj, raw=Atomic, recurse=True, check_circular=True, 
@@ -173,7 +173,7 @@ def class_to_dict_spec(cls):
                     key = Rec.OptKey(name)
                 else:
                     key = name
-                newspec[key] = normalize(argspec.annotations[name])
+                newspec[key] = TypeSpecMeta._normalize(argspec.annotations[name])
                 names.add(name)
     # other args with default are optional
     if argspec.defaults:
@@ -252,6 +252,7 @@ def transcode(value, spec):
                 except TypeError as e:
                     error = e
             raise error
+        print(spec, 'is alt!', value)
         return spec._expand(value, alternative)
     elif isinstance(value, spec):
         return value
@@ -322,7 +323,7 @@ def decode(value, spec):
       >>> decode((None, {'a': 2}), (Opt(Container), DecExample))
       (None, <DecExample(2)>)
     '''
-    return transcode(value, normalize(spec))
+    return transcode(value, TypeSpecMeta._normalize(spec))
 
 
 if __name__ == "__main__":

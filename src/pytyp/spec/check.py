@@ -2,11 +2,11 @@
 from inspect import getcallargs, getfullargspec
 from functools import wraps
 
-from pytyp.spec.abcs import fmt, normalize, type_error
+from pytyp.spec.abcs import type_error, TypeSpecMeta
 
 
 def verify(value, spec):
-    if not isinstance(value, normalize(spec)):
+    if not isinstance(value, TypeSpecMeta._normalize(spec)):
         type_error(value, spec)
 
 
@@ -44,7 +44,7 @@ def checked(func):
         for name in annotations:
             spec = annotations[name]
             try:
-                verify(callargs.get(name), normalize(spec))
+                verify(callargs.get(name), TypeSpecMeta._normalize(spec))
             except AttributeError:
                 pass
         result = func(*args, **kargs)

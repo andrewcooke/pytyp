@@ -11,47 +11,6 @@ from weakref import WeakSet, WeakKeyDictionary
 from pytyp.util import items
 
 
-class TypeSpecMeta(ABCMeta):
-    
-    def __instancecheck__(cls, instance):
-        try:
-            # if false may still be subclass
-            if cls.__instancehook__(instance): 
-                return True
-        except AttributeError:
-            pass
-        return super().__instancecheck__(instance)
-    
-    
-class TypeSpec(metaclass=TypeSpecMeta):
-
-    @classmethod
-    def _structuralcheck(cls, instance):
-        return cls._expand(instance, cls._verify)
-    
-
-class Atomic(metaclass=ABCMeta):
-    '''
-    These are (normal) types that should not be normalised.
-    '''
-    
-Atomic.register(Number)
-Atomic.register(ByteString)
-Atomic.register(str)
-Atomic.register(bool)
-
-
-class NoStructural(metaclass=ABCMeta): pass
-
-class NoNormalize(): pass
-
-
-class RecursiveType(TypeError):
-    
-    @staticmethod
-    def throw(_): raise RecursiveType
-
-
 def make_recursive_block(make_key=lambda args: id(args[0]), 
                             on_recursion=lambda x: x):
 
@@ -80,84 +39,128 @@ block_recursive_type = make_recursive_block(lambda args: (id(args[0]), id(args[1
                                             lambda _: RecursiveType.throw())
 
 
-@make_recursive_block()
-def normalize(spec):
-    '''
-    >>> fmt(normalize(Rec(a=int)))
-    'Rec(a=int)'
-    >>> fmt(normalize({'a': int}))
-    'Rec(a=int)'
-    >>> fmt(normalize((int, str)))
-    'Rec(0=int,1=str)'
-    >>> fmt(normalize(Rec((int,), {'a':str})))
-    'Rec(0=Rec(0=int),1=Rec(a=str))'
-    >>> fmt(normalize([int]))
-    'Seq(int)'
-    >>> fmt(normalize([]))
-    'Seq'
-    >>> fmt(normalize(Seq([int])))
-    'Seq(Seq(int))'
-    >>> fmt(normalize(int))
-    'int'
-    >>> class Foo: pass
-    >>> fmt(normalize(Foo))
-    'Cls(Foo)'
-    >>> fmt(normalize(Alt(int, str)))
-    'Alt(0=int,1=str)'
-    >>> fmt(normalize(Alt(int, Foo)))
-    'Alt(0=int,1=Cls(Foo))'
-    >>> fmt(normalize(Opt([int])))
-    'Opt(Seq(int))'
-    >>> fmt([int, str])
-    'Rec(0=int,1=str)'
-    '''
-    if isinstance(spec, list):
-        if not spec:
-            return Seq
-        if len(spec) == 1:
-            return Seq(normalize(spec[0]))
-        else:
-            return Rec(*map(normalize, spec))
-    elif isinstance(spec, dict):
-        return Rec(_dict=dict((name, normalize(spec[name])) for name in spec))
-    elif isinstance(spec, tuple):
-        return Rec(*tuple(normalize(s) for s in spec))
-    elif isinstance(spec, type):
-        if issubclass(spec, Delayed):
-            spec._spec = normalize(spec._spec)
-            return spec
-        elif issubclass(spec, Atomic):
-            return spec
-        elif NoNormalize in spec.__bases__:
-            return spec
-        else:
-            return Cls(spec)
-    else:
-        return normalize(type(spec))
-
-
-def fmt(spec):
-    try:
-        return normalize(spec)._fmt()
-    except AttributeError:
+class TypeSpecMeta(ABCMeta):
+    
+    def __instancecheck__(cls, instance):
         try:
-            return spec.__name__
+            # if false may still be subclass
+            if cls.__instancehook__(instance): 
+                return True
         except AttributeError:
-            return repr(spec) # only on bad type
+            pass
+        return super().__instancecheck__(instance)
+    
+    @staticmethod
+    @make_recursive_block()
+    def _normalize(spec):
+        '''
+        >>> TypeSpecMeta._normalize(Rec(a=int))
+        Rec(a=int)
+        >>> TypeSpecMeta._normalize({'a': int})
+        Rec(a=int)
+        >>> TypeSpecMeta._normalize((int, str))
+        Rec(0=int,1=str)
+        >>> TypeSpecMeta._normalize(Rec((int,), {'a':str}))
+        Rec(0=Rec(0=int),1=Rec(a=str))
+        >>> TypeSpecMeta._normalize([int])
+        Seq(int)
+        >>> TypeSpecMeta._normalize([])
+        Seq
+        >>> Seq([int])
+        Seq(Seq(int))
+        >>> TypeSpecMeta._normalize(int)
+        int
+        >>> class Foo: pass
+        >>> TypeSpecMeta._normalize(Foo)
+        Cls(Foo)
+        >>> TypeSpecMeta._normalize(Alt(int, str))
+        Alt(0=int,1=str)
+        >>> TypeSpecMeta._normalize(Alt(int, Foo))
+        Alt(0=int,1=Cls(Foo))
+        >>> TypeSpecMeta._normalize(Opt([int]))
+        Opt(Seq(int))
+        >>> TypeSpecMeta._normalize([int, str])
+        Rec(0=int,1=str)
+        '''
+        if isinstance(spec, list):
+            if not spec:
+                return Seq
+            if len(spec) == 1:
+                return Seq(TypeSpecMeta._normalize(spec[0]))
+            else:
+                return Rec(*map(TypeSpecMeta._normalize, spec))
+        elif isinstance(spec, dict):
+            return Rec(_dict=dict((name, TypeSpecMeta._normalize(spec[name])) 
+                                  for name in spec))
+        elif isinstance(spec, tuple):
+            return Rec(*tuple(TypeSpecMeta._normalize(s) for s in spec))
+        elif isinstance(spec, type):
+            if issubclass(spec, Delayed):
+                spec._spec = TypeSpecMeta._normalize(spec._spec)
+                return spec
+            elif NoNormalize in spec.__bases__:
+                return spec
+            else:
+                return Cls(spec)
+        else:
+            return TypeSpecMeta._normalize(type(spec))
+    
+    @recursive_repr()
+    def __repr__(cls):
+        try:
+            return cls._reprhook()
+        except AttributeError:
+            return super().__repr__()
     
     
+class TypeSpec(metaclass=TypeSpecMeta):
+
+    @classmethod
+    def _structuralcheck(cls, instance):
+        return cls._expand(instance, cls._verify)
+    
+    @classmethod
+    def _reprhook(cls):
+        try:
+            return '{}({})'.format(cls._abc_name, cls._fmt_args())
+        except AttributeError:
+            return cls.__name__
+    
+
+class Atomic(metaclass=ABCMeta):
+    '''
+    These are (normal) types that should not be normalised.
+    '''
+    
+Atomic.register(Number)
+Atomic.register(ByteString)
+Atomic.register(str)
+Atomic.register(bool)
+
+
+class NoStructural(): pass
+
+class NoNormalize(): pass
+
+
+class RecursiveType(TypeError):
+    
+    @staticmethod
+    def throw(_): raise RecursiveType
+
+
 def expand(value, spec, callback):
-    return normalize(spec)._expand(value, callback)
+    return TypeSpecMeta._normalize(spec)._expand(value, callback)
     
     
 def type_error(value, spec):
-    raise TypeError('Type {1} inconsistent with {0!r}.'.format(value, fmt(spec)))
+    raise TypeError('Type {1} inconsistent with {0!r}.'.format(value, spec))
         
         
 def _hashable_types(args, kargs):
-    types = dict((name, normalize(karg)) for (name, karg) in kargs.items())
+    types = dict((name, TypeSpecMeta._normalize(karg)) for (name, karg) in kargs.items())
     for (index, arg) in zip(count(), args):
-        types[index] = normalize(arg)
+        types[index] = TypeSpecMeta._normalize(arg)
     return tuple((key, types[key]) for key in sorted(types.keys()))
 
 
@@ -166,10 +169,10 @@ def _unhashable_types(types):
             dict((name, spec) for (name, spec) in types if not isinstance(name, int)))
         
 
-def _polymorphic_subclass(abc, args, kargs, _normalize=None):
-    if _normalize:
-        args = tuple(_normalize(arg) for arg in args)
-        kargs = dict((name, _normalize(karg)) for (name, karg) in kargs.items())
+def _polymorphic_subclass(abc, args, kargs):
+    args = tuple(TypeSpecMeta._normalize(arg) for arg in args)
+    kargs = dict((name, TypeSpecMeta._normalize(karg)) 
+                 for (name, karg) in kargs.items())
     types = _hashable_types(args, kargs)
     if types not in abc._abc_polymorphic_cache:
         
@@ -198,6 +201,7 @@ def _polymorphic_subclass(abc, args, kargs, _normalize=None):
                              (abc, NoStructural, NoNormalize),
                              {'_abc_type_arguments': types,
                               '_abc_instance_registry': WeakSet(),
+                              '_abc_name': abc.__name__,
                               'register_instance': register_instance,
                               '__instancehook__': __instancehook__})
                 
@@ -242,11 +246,11 @@ class Seq(Product, TypeSpec, NoNormalize):
     def __getitem__(self, index):
         raise IndexError
     
-    def __new__(cls, *args, _normalize=normalize, **kargs):
+    def __new__(cls, *args, **kargs):
         if cls is Seq: # check args only when being used as a class factory
             if kargs or len(args) != 1:
                 raise TypeError('Seq requires a single, unnamed argument')
-            return _polymorphic_subclass(cls, args, kargs, _normalize=_normalize)
+            return _polymorphic_subclass(cls, args, kargs)
         else:
             return super().__new__(cls, *args, **kargs)
 
@@ -262,11 +266,8 @@ class Seq(Product, TypeSpec, NoNormalize):
         return callback(vsn())
             
     @classmethod
-    def _fmt(cls):
-        try:
-            return 'Seq({0})'.format(fmt(cls._abc_type_arguments[0][1]))
-        except AttributeError:
-            return 'Seq'
+    def _fmt_args(cls):
+        return cls._abc_type_arguments[0][1]
 
     
 class Rec(Product, TypeSpec, NoNormalize):
@@ -311,13 +312,13 @@ class Rec(Product, TypeSpec, NoNormalize):
     def __getitem__(self, index):
         raise IndexError
 
-    def __new__(cls, *args, _normalize=normalize, _dict=None, **kargs):
+    def __new__(cls, *args, _dict=None, **kargs):
         if cls is Rec: # check args only when being used as a class factory
             if _dict: kargs.update(_dict) 
             if (kargs and args) or (not args and not kargs):
                 raise TypeError('Map requires named or unnamed arguments, but not both')
             kargs = dict((Rec.OptKey.decode(name), arg) for (name, arg) in kargs.items())
-            return _polymorphic_subclass(cls, args, kargs, _normalize=_normalize)
+            return _polymorphic_subclass(cls, args, kargs)
         else:
             return super().__new__(cls, *args, **kargs)
         
@@ -354,13 +355,9 @@ class Rec(Product, TypeSpec, NoNormalize):
         return True
 
     @classmethod
-    def _fmt(cls):
-        try:
-            return 'Rec({0})'.format(
-                        ','.join('{0}={1}'.format(name, fmt(spec))
-                                 for (name, spec) in cls._abc_type_arguments))
-        except AttributeError:
-            return 'Map'
+    def _fmt_args(cls):
+        return','.join('{0}={1}'.format(name, spec)
+                       for (name, spec) in cls._abc_type_arguments)
 
 
 class Atr(Product, TypeSpec, NoNormalize):
@@ -371,12 +368,12 @@ class Atr(Product, TypeSpec, NoNormalize):
     def __getattr__(self, key):
         raise KeyError
 
-    def __new__(cls, *args, _normalize=normalize, _dict=None, **kargs):
+    def __new__(cls, *args, _dict=None, **kargs):
         if cls is Atr: # check args only when being used as a class factory
             if _dict: kargs.update(_dict) 
             if args or not kargs:
                 raise TypeError('Atr requires named arguments')
-            return _polymorphic_subclass(cls, (), kargs, _normalize=_normalize)
+            return _polymorphic_subclass(cls, (), kargs)
         else:
             return super().__new__(cls, *args, **kargs)
         
@@ -396,13 +393,9 @@ class Atr(Product, TypeSpec, NoNormalize):
         return callback(vsn())
         
     @classmethod
-    def _fmt(cls):
-        try:
-            return 'Atr({0})'.format(
-                        ','.join('{0}={1}'.format(name, fmt(spec))
-                                 for (name, spec) in cls._abc_type_arguments))
-        except AttributeError:
-            return 'Atr'
+    def _fmt_args(cls):
+        return ','.join('{0}={1}'.format(name, spec)
+                        for (name, spec) in cls._abc_type_arguments)
 
 
 class Alt(Sum, TypeSpec, NoNormalize):
@@ -413,11 +406,11 @@ class Alt(Sum, TypeSpec, NoNormalize):
     
     _abc_polymorphic_cache = {}
     
-    def __new__(cls, *args, _normalize=normalize, **kargs):
+    def __new__(cls, *args, **kargs):
         if cls is Alt: # check args only when being used as a class factory
             if (kargs and args) or (not args and not kargs):
                 raise TypeError('Alt requires named or unnamed arguments, but not both')
-            return _polymorphic_subclass(cls, args, kargs, _normalize=_normalize)
+            return _polymorphic_subclass(cls, args, kargs)
         else:
             return super().__new__(cls, *args, **kargs)
         
@@ -433,13 +426,17 @@ class Alt(Sum, TypeSpec, NoNormalize):
         return callback(vsn())
         
     @classmethod
-    def _fmt(cls):
-        try:
-            return 'Alt({0})'.format(
-                        ','.join('{0}={1}'.format(name, fmt(spec))
-                                 for (name, spec) in cls._abc_type_arguments))
-        except AttributeError:
-            return 'Alt'
+    def __subclasshook__(cls, subclass):
+        if cls not in (Alt, Opt) and \
+                cls._expand(subclass, lambda vsn: cls._verify(vsn, check=issubclass)):
+            return True
+        else:
+            return NotImplemented
+
+    @classmethod
+    def _fmt_args(cls):
+        return ','.join('{0}={1}'.format(name, spec)
+                        for (name, spec) in cls._abc_type_arguments)
 
     @classmethod
     def _on(cls, value, **choices):
@@ -447,7 +444,7 @@ class Alt(Sum, TypeSpec, NoNormalize):
             for (name, spec) in cls._abc_type_arguments:
                 if choice == name and isinstance(value, spec):
                     return choices[choice](value)
-        raise TypeError('Cannot dispatch {0} on {1}'.format(value, fmt(cls)))
+        raise TypeError('Cannot dispatch {0} on {1}'.format(value, cls))
 
 
 class Opt(Alt, NoNormalize):
@@ -455,28 +452,24 @@ class Opt(Alt, NoNormalize):
     # defining this as a subclass of Alt, rather than simple function that calls
     # Alt just gives a nicer formatting
     
-    def __new__(cls, *args, _normalize=normalize, **kargs):
+    def __new__(cls, *args, **kargs):
         if cls is Opt: # check args only when being used as a class factory
             if kargs or len(args) != 1:
                 raise TypeError('Opt requires a single, unnamed argument')
-            return _polymorphic_subclass(cls, (), {'none':type(None), 'value':args[0]}, 
-                                         _normalize=_normalize)
+            return _polymorphic_subclass(cls, (), {'none':type(None), 'value':args[0]})
         else:
             return super().__new__(cls, *args, **kargs)
             
     @classmethod
-    def _fmt(cls):
-        try:
-            return 'Opt({0})'.format(fmt(cls._abc_type_arguments[1][1]))
-        except AttributeError:
-            return 'Opt'
+    def _fmt_args(cls):
+        return cls._abc_type_arguments[1][1]
     
 
-class Cls:
+class Cls(TypeSpec):
     
     _abc_class_cache = WeakKeyDictionary()
     
-    def __new__(cls, class_, _normalize=normalize, **kargs):
+    def __new__(cls, class_, **kargs):
         if class_ not in cls._abc_class_cache:
 
             # TODO - convert to call to type with name
@@ -495,14 +488,28 @@ class Cls:
                 @classmethod
                 def _structuralcheck(cls, instance):
                     return isinstance(instance, cls._abc_class)
+                
+                @classmethod
+                def __subclasshook__(cls, subclass):
+                    if issubclass(subclass, cls._abc_class):
+                        return True
+                    else:
+                        return NotImplemented
 
                 @classmethod
-                def _fmt(cls):
-                    return 'Cls({0})'.format(cls._abc_class.__name__)
+                def _reprhook(cls):
+                    if issubclass(cls._abc_class, Atomic):
+                        return cls._abc_class.__name__
+                    else:
+                        return super()._reprhook()
+
+                @classmethod
+                def _fmt_args(cls):
+                    return cls._abc_class.__name__
         
             cls._abc_class_cache[class_] = __Cls
-        abc = _polymorphic_subclass(cls._abc_class_cache[class_], (), {},
-                                    _normalize=_normalize)
+        abc = _polymorphic_subclass(cls._abc_class_cache[class_], (), {})
+        abc._abc_name = Cls.__name__
         if kargs:
             return And(abc, Atr(**kargs))
         else:
@@ -511,36 +518,39 @@ class Cls:
 Any = Cls(object)
 
 
-def transitive_ordered(args, cls):
-    '''
-    >>> list(transitive_ordered([int,And(str,float)], And))
-    [<class 'str'>, <class 'float'>, <class 'int'>]
-    >>> list(transitive_ordered([float,And(int,str)], And))
-    [<class 'str'>, <class 'float'>, <class 'int'>]
-    '''
-    def expand(args, flat):
-        for arg in args:
-            if isinstance(arg, type) and issubclass(arg, cls) and hasattr(arg, '_abc_type_arguments'):
-                expand((spec for (_, spec) in arg._abc_type_arguments), flat)
-            else:
-                flat.add(arg)
-        return flat
-    return sorted(expand(args, set()), key=id)
-
-
 class _Set(TypeSpec):
     
-    def __new__(cls, *args, _normalize=normalize, **kargs):
+    def __new__(cls, *args, **kargs):
         if _Set in cls.__bases__: # check args only when being used as a class factory
             if kargs or not args:
                 raise TypeError('{} requires unnamed arguments'.format(cls.__name__))
-            args = transitive_ordered(args, cls)
-            abc = _polymorphic_subclass(cls, args, {}, _normalize=_normalize)
+            args = cls.transitive_ordered(args)
+            abc = _polymorphic_subclass(cls, args, {})
             abc._set_name = cls.__name__
             return abc
         else:
             return super().__new__(cls, *args, **kargs)
-        
+    
+    @classmethod
+    def transitive_ordered(cls, args):
+        '''
+        >>> list(And.transitive_ordered([int,And(str,float)]))
+        [<class 'str'>, <class 'float'>, <class 'int'>]
+        >>> list(And.transitive_ordered([float,And(int,str)]))
+        [<class 'str'>, <class 'float'>, <class 'int'>]
+        '''
+        def expand(args, flat):
+            for arg in args:
+                if isinstance(arg, type) and issubclass(arg, cls) and hasattr(arg, '_abc_type_arguments'):
+                    expand((spec for (_, spec) in arg._abc_type_arguments), flat)
+                else:
+                    try:
+                        flat.add(arg._abc_class)
+                    except AttributeError:
+                        flat.add(arg)
+            return flat
+        return sorted(expand(args, set()), key=id)
+
     @classmethod
     def _expand(cls, value, callback):
         def vsn():
@@ -558,15 +568,10 @@ class _Set(TypeSpec):
             return NotImplemented
         else:
             return cls._expand(subclass, lambda vsn: cls._verify(vsn, check=issubclass))
-        
 
     @classmethod
-    def _fmt(cls):
-        try:
-            return '{0}({1})'.format(cls._set_name,
-                        ','.join(fmt(spec) for (_, spec) in cls._abc_type_arguments))
-        except AttributeError:
-            return cls.__name__
+    def _fmt_args(cls):
+        return ','.join(spec for (_, spec) in cls._abc_type_arguments)
 
 
 class And(Product, _Set):
@@ -579,16 +584,17 @@ class Or(Sum, _Set):
     _abc_polymorphic_cache = {}
     
 
-class Delayed(metaclass=TypeSpecMeta):
+class Delayed(TypeSpec):
     
     _count = 0
     
-    def __new__(cls, *args, _normalize=normalize, **kargs):
+    def __new__(cls, *args, **kargs):
         cls._count += 1
         return type(cls.__name__ + '_' + str(cls._count),
                     (cls,),
                     {'_spec': None,
-                     '_defined': False})
+                     '_defined': False,
+                     '_abc_name': 'Delayed'})
     
     @classmethod
     def set(cls, spec):
@@ -623,9 +629,8 @@ class Delayed(metaclass=TypeSpecMeta):
         return cls.get()._structuralcheck(instance)
 
     @classmethod
-    @recursive_repr()
-    def _fmt(cls):
-        return 'Delayed({0})'.format(fmt(cls.get()))
+    def _fmt_args(cls):
+        return cls.get()
     
     @classmethod
     def _on(cls, value, **choices):

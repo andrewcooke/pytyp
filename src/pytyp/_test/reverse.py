@@ -162,6 +162,7 @@ class ReverseTest(TestCase):
             assert False, 'expected error'
         except TypeError:
             pass
+
         
     def test_inheritance_2(self):
         class Const: pass

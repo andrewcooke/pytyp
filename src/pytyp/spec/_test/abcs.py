@@ -86,7 +86,7 @@ class SeqTest(TestCase):
         
     def test_is_subclass(self):
         assert issubclass(list, Sequence)
-        assert issubclass(list, Seq)
+        assert issubclass(list, Seq())
         assert not issubclass(list, Seq(int))
 
     def test_register(self):
@@ -100,7 +100,7 @@ class SeqTest(TestCase):
         Seq(int).register(Foo)
         assert not issubclass(Foo, Seq(str))
         assert issubclass(Foo, Seq(int))
-        assert issubclass(Foo, Seq)
+        assert issubclass(Foo, Seq())
         
     def test_seq_structural(self):
         assert isinstance([1,2,3], Seq(int))
@@ -133,9 +133,9 @@ class MapTest(TestCase):
         assert bar['a'] == 1
         assert isinstance(bar, Rec(a=int, b=str))
         assert not isinstance(bar, Rec(a=int, b=int))
-        assert isinstance({}, Rec)
+        assert isinstance({}, Rec())
         
-        assert issubclass(Bar, Rec)
+        assert issubclass(Bar, Rec())
         assert not issubclass(Bar, Rec(a=int, b=float))
         assert issubclass(Bar, Rec(a=int, b=str))
         
@@ -191,7 +191,7 @@ class AltTest(TestCase):
         assert not issubclass(int, Alt)
         assert issubclass(Alt, Alt)
         assert issubclass(Opt, Alt)
-
+        
 
 class OptTest(TestCase):
     
@@ -306,4 +306,6 @@ class OrderTest(TestCase):
     def test_order(self):
         ordered = And.transitive_ordered([int, And(str, float)])
         assert len(ordered) == 3, ordered
+        
+        
     

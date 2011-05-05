@@ -84,7 +84,7 @@ class TypeSpecMeta(ABCMeta):
         '''
         if isinstance(spec, list):
             if not spec:
-                return Seq
+                return Seq()
             if len(spec) == 1:
                 return Seq(TypeSpecMeta._normalize(spec[0]))
             else:
@@ -113,7 +113,27 @@ class TypeSpecMeta(ABCMeta):
             return super().__repr__()
     
     
-class TypeSpec(metaclass=TypeSpecMeta):
+class NoStructural():
+    '''
+    This identifies subclasses of type specifications, which should not need 
+    to have structural verification.  It's equivalent to TypeSpec, but avoids
+    the ABC registration logic.
+    '''
+    pass
+
+
+class NoNormalize():
+    '''
+    Immediate subclasses are considered to be type specifications and are not
+    normalized.
+    '''
+    pass
+
+
+class TypeSpec(NoStructural, metaclass=TypeSpecMeta):
+    '''
+    Subclasses must provide their own cls._abc_instance_registry as a WeakSet.
+    '''
 
     @classmethod
     def _structuralcheck(cls, instance):
@@ -126,10 +146,29 @@ class TypeSpec(metaclass=TypeSpecMeta):
         except AttributeError:
             return cls.__name__
     
+    @classmethod
+    def register_instance(cls, instance):
+        if isinstance(instance, cls):
+            return  # Already an instance
+        cls._abc_instance_registry.add(instance)
+        
+    @classmethod
+    @block_recursive_type
+    def __instancehook__(cls, instance):
+        try:
+            if instance in cls._abc_instance_registry:
+                return True
+        except TypeError: # unhashable
+            pass
+        # only do structural check for classes that are not already subclasses
+        # or we get confusing results with empty containers (and slower code)
+        if not isinstance(instance, NoStructural):
+            return cls._structuralcheck(instance)
+
 
 class Atomic(metaclass=ABCMeta):
     '''
-    These are (normal) types that should not be normalised.
+    These are formatted without "Cls(...)".
     '''
     
 Atomic.register(Number)
@@ -138,15 +177,13 @@ Atomic.register(str)
 Atomic.register(bool)
 
 
-class NoStructural(): pass
-
-class NoNormalize(): pass
-
-
 class RecursiveType(TypeError):
     
     @staticmethod
     def throw(_): raise RecursiveType
+
+
+class DelayedTypeError(TypeError): pass
 
 
 def expand(value, spec, callback):
@@ -176,34 +213,13 @@ def _polymorphic_subclass(abc, args, kargs):
     types = _hashable_types(args, kargs)
     if types not in abc._abc_polymorphic_cache:
         
-        @classmethod
-        def register_instance(cls, instance):
-            if isinstance(instance, cls):
-                return  # Already an instance
-            cls._abc_instance_registry.add(instance)
-            
-        @classmethod
-        @block_recursive_type
-        def __instancehook__(cls, instance):
-            try:
-                if instance in cls._abc_instance_registry:
-                    return True
-            except TypeError: # unhashable
-                pass
-            # only do structural check for classes that are not already subclasses
-            # or we get confusing results with empty containers (and slower code)
-            if not isinstance(instance, NoStructural):
-                return cls._structuralcheck(instance)
-                
         # replaced a standard class definition with this to help with debugging
         # as it was confusing when everything had the same name
         subclass = type(abc)(abc.__name__ + '_' + str(abs(hash(types))), 
-                             (abc, NoStructural, NoNormalize),
+                             (abc, TypeSpec, NoNormalize),
                              {'_abc_type_arguments': types,
                               '_abc_instance_registry': WeakSet(),
-                              '_abc_name': abc.__name__,
-                              'register_instance': register_instance,
-                              '__instancehook__': __instancehook__})
+                              '_abc_name': abc.__name__})
                 
         abc._abc_polymorphic_cache[types] = subclass
     return abc._abc_polymorphic_cache[types]
@@ -238,7 +254,7 @@ class Sum:
         return False
     
 
-class Seq(Product, TypeSpec, NoNormalize):
+class Seq(Product):
     
     _abc_polymorphic_cache = {}
     
@@ -248,9 +264,14 @@ class Seq(Product, TypeSpec, NoNormalize):
     
     def __new__(cls, *args, **kargs):
         if cls is Seq: # check args only when being used as a class factory
-            if kargs or len(args) != 1:
+            if kargs or len(args) > 1:
                 raise TypeError('Seq requires a single, unnamed argument')
-            return _polymorphic_subclass(cls, args, kargs)
+            if not args:
+                args = (type,)
+            spec = _polymorphic_subclass(cls, args, kargs)
+            if args[0] is not type:
+                Seq().register(spec)
+            return spec
         else:
             return super().__new__(cls, *args, **kargs)
 
@@ -270,7 +291,7 @@ class Seq(Product, TypeSpec, NoNormalize):
         return cls._abc_type_arguments[0][1]
 
     
-class Rec(Product, TypeSpec, NoNormalize):
+class Rec(Product):
     
     _abc_polymorphic_cache = {}
     
@@ -315,10 +336,13 @@ class Rec(Product, TypeSpec, NoNormalize):
     def __new__(cls, *args, _dict=None, **kargs):
         if cls is Rec: # check args only when being used as a class factory
             if _dict: kargs.update(_dict) 
-            if (kargs and args) or (not args and not kargs):
+            if kargs and args:
                 raise TypeError('Map requires named or unnamed arguments, but not both')
             kargs = dict((Rec.OptKey.decode(name), arg) for (name, arg) in kargs.items())
-            return _polymorphic_subclass(cls, args, kargs)
+            spec = _polymorphic_subclass(cls, args, kargs)
+            if args:
+                Rec().register(spec)
+            return spec
         else:
             return super().__new__(cls, *args, **kargs)
         
@@ -360,7 +384,7 @@ class Rec(Product, TypeSpec, NoNormalize):
                        for (name, spec) in cls._abc_type_arguments)
 
 
-class Atr(Product, TypeSpec, NoNormalize):
+class Atr(Product):
     
     _abc_polymorphic_cache = {}
     
@@ -373,7 +397,8 @@ class Atr(Product, TypeSpec, NoNormalize):
             if _dict: kargs.update(_dict) 
             if args or not kargs:
                 raise TypeError('Atr requires named arguments')
-            return _polymorphic_subclass(cls, (), kargs)
+            spec = _polymorphic_subclass(cls, (), kargs)
+            return spec
         else:
             return super().__new__(cls, *args, **kargs)
         
@@ -398,7 +423,7 @@ class Atr(Product, TypeSpec, NoNormalize):
                         for (name, spec) in cls._abc_type_arguments)
 
 
-class Alt(Sum, TypeSpec, NoNormalize):
+class Alt(Sum):
     
     # this makes no sense as a mixin - it exists only to specialise the 
     # functionality provided by the Polymorphic factory above (ie to hold 
@@ -408,9 +433,10 @@ class Alt(Sum, TypeSpec, NoNormalize):
     
     def __new__(cls, *args, **kargs):
         if cls is Alt: # check args only when being used as a class factory
-            if (kargs and args) or (not args and not kargs):
+            if (kargs and args) or not (args or kargs):
                 raise TypeError('Alt requires named or unnamed arguments, but not both')
-            return _polymorphic_subclass(cls, args, kargs)
+            spec = _polymorphic_subclass(cls, args, kargs)
+            return spec
         else:
             return super().__new__(cls, *args, **kargs)
         
@@ -422,7 +448,10 @@ class Alt(Sum, TypeSpec, NoNormalize):
                     yield (value, spec, name)
             else:
                 yield (value, None, None)
-            raise TypeError('No alternative for {0}'.format(value))
+            try:
+                raise TypeError('No alternative for {0}'.format(value))
+            except DelayedTypeError:
+                raise TypeError('No alternative'.format(value))
         return callback(vsn())
         
     @classmethod
@@ -456,7 +485,11 @@ class Opt(Alt, NoNormalize):
         if cls is Opt: # check args only when being used as a class factory
             if kargs or len(args) != 1:
                 raise TypeError('Opt requires a single, unnamed argument')
-            return _polymorphic_subclass(cls, (), {'none':type(None), 'value':args[0]})
+            kargs = {'none':type(None), 'value':args[0]}
+            spec = _polymorphic_subclass(cls, (), kargs)
+            if args[0] != object:
+                Alt(*kargs).register(spec)
+            return spec
         else:
             return super().__new__(cls, *args, **kargs)
             
@@ -465,17 +498,18 @@ class Opt(Alt, NoNormalize):
         return cls._abc_type_arguments[1][1]
     
 
-class Cls(TypeSpec):
+class Cls:
     
     _abc_class_cache = WeakKeyDictionary()
     
-    def __new__(cls, class_, **kargs):
+    def __new__(cls, class_=object, **kargs):
         if class_ not in cls._abc_class_cache:
 
             # TODO - convert to call to type with name
 
             class __Cls(Cls, TypeSpec, NoNormalize):
                 
+                _abc_instance_registry = WeakSet()
                 _abc_polymorphic_cache = {}
                 _abc_class = class_
 
@@ -485,10 +519,6 @@ class Cls(TypeSpec):
                         yield (value, cls._abc_class, None)
                     return callback(vsn())
 
-                @classmethod
-                def _structuralcheck(cls, instance):
-                    return isinstance(instance, cls._abc_class)
-                
                 @classmethod
                 def __subclasshook__(cls, subclass):
                     if issubclass(subclass, cls._abc_class):
@@ -508,14 +538,16 @@ class Cls(TypeSpec):
                     return cls._abc_class.__name__
         
             cls._abc_class_cache[class_] = __Cls
-        abc = _polymorphic_subclass(cls._abc_class_cache[class_], (), {})
-        abc._abc_name = Cls.__name__
+        spec = _polymorphic_subclass(cls._abc_class_cache[class_], (), {})
+        spec._abc_name = Cls.__name__
+        if class_ is not object:
+            Cls().register(spec)
         if kargs:
-            return And(abc, Atr(**kargs))
+            return And(spec, Atr(**kargs))
         else:
-            return abc
+            return spec
     
-Any = Cls(object)
+Any = Cls()
 
 
 class _Set(TypeSpec):
@@ -598,13 +630,15 @@ class Delayed(TypeSpec):
     
     @classmethod
     def set(cls, spec):
-        assert not cls._defined, 'Delayed already defined'
+        if cls._defined:
+            raise DelayedTypeError('Delayed defined')
         cls._spec = spec
         cls._defined = True
     
     @classmethod
     def get(cls):
-        assert cls._defined, 'Delayed not defined'
+        if not cls._defined:
+            raise DelayedTypeError('Delayed not defined')
         return cls._spec
     
     @classmethod
@@ -637,13 +671,16 @@ class Delayed(TypeSpec):
         return cls.get()._on(value, **choices)
 
 
-Container.register(Seq)
-Seq.register(Sequence)
-Seq.register(MutableSequence)
+def copy_registry(abc, target):
+    for cls in abc._abc_registry:
+        target.register(cls)
 
-Container.register(Rec)
-Rec.register(Mapping)
-Rec.register(MutableMapping)
+Container.register(Seq())
+copy_registry(Sequence, Seq())
+copy_registry(MutableSequence, Seq())
+Container.register(Rec())
+copy_registry(Mapping, Rec())
+copy_registry(MutableMapping, Rec())
 
 
 if __name__ == "__main__":

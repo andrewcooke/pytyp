@@ -423,6 +423,21 @@ The ``Pytyp`` Library
 The previous sections explored a variety of ideas.  Now I will describe the
 ``pytyp`` library.
 
+Expansion
+~~~~~~~~~
+
+Expansion is the main ...
+
+Expansion is the recursive exploration of data described by a type
+specification.  A callback allows values to be processed (it receives value,
+type specification, and any available label) and can recurse on its contents,
+giving the caller control over exactly what values are "atomic".  Exceptions
+are made available to the callback by providing the data as generators.
+
+This is used to implement structural type verification: each value in turn is
+checked against the ABC registry and superclasses; if these fail then the
+value is expanded and the process repeated on the contents.
+
 ABCs
 ~~~~
 
@@ -481,57 +496,43 @@ confusing during dispatch by type.
 Class Hierarchy
 ...............
 
-In practice, because ``pytyp`` is a library, we cannot modify existing ABCs.
-Instead, ``pytyp`` introduces a new class hierarchy, based on
-``TypeSpecMeta``, which is a subclass of ``ABCMeta``.  This hierarchy is
-"patched in" to the existing ABCs using registration.
+The full hierarchy is (subclassed / registered to right)::
 
-So ``Seq`` IS SOMETHING TO ``Sequence`` and ``Seq(int)`` creates a subclass of
-``Seq`` specialised to represent ``int`` sequences, which can itself be
-subclassed::
+                 ,- X in Sequence._abc_registry
+   Seq -+ Seq(*) +- Seq(X)
+       /         `- X in MutableSequence._abc_registry
+    Container
+       \        ,- X in Mapping._abc_registry
+   Rec -+ Rec() +- Rec(X)
+                `- X in MutableMapping._abc_registry
+   Atr -- Atr(X)
+   Cls -- Cls(*) -- Cls(X)
+   Alt -- Alt(X)
+    \      \ 
+     Opt -- Opt(X)      Foo: Type Spec Constructor
+   And -- And(X)        Foo(): Type Specification (ABC)
+   Or -- Or(X)          Foo(*): Implicit "object" arg
 
-    >>> class MyIntList(list, Seq(int)): pass
-    >>> isinstance(MyIntList(), Seq(int))
-    True
-    >>> isinstance(MyIntList(), Sequence)
-    True
-    >>> isinstance(MyIntList(), Seq(float))
-    False
+None of the ABCs have abstract or mixin methods.
 
-CORRECT THIS.
+Several additional classes modify behaviour.  Classes with ``NoNormalize`` as
+an *immediate* superclass are considered to be type specifications during
+normalization (other classes will be wrapped by ``Cls()``).  ``NoStructural``
+identified classes that inherit from type specifications and so do not need
+structural verification.  Subclasses of ``Atomic`` are displayed without the
+``Cls`` wrapper.
 
-Also, ``Record`` and ``MutableRecord`` are introduced as subclasses of
-``Collection``, adding ``__getitem__()`` and ``__set­item__()``, respectively.
-``Sequence``, ``Rec``, etc. are then registered with these.
+Instance Registration
+.....................
 
-Registration
-............
+``TypeSpecMeta`` extends ``__instancecheck__`` (called by ``is­instance()``)
+to delegate to ``__instancehook__`` on the class, if present.  This parallels
+the use of ``__subclasshook__`` within ``__subclasscheck__`` (the standard ABC
+type extension mechanism).
 
-CORRECT THIS.
-
-We must extend registration to include instances.  This implies an extra cache
-in the ABCs and a modification to the code that implements ``isinstance()``.
-
-Extending ``isinstance()`` is difficult: despite the language in PEP 3119 [#]_
-and Issue 1708353 [#]_, ``__instancecheck__()`` can only be over–ridden *on
-the metaclass* [#]_.  Since a new metaclass would break inheritance of the
-existing ABCs ``pytyp`` uses a "monkey patch" to delegate to
-``__inst­ance­hook__()`` [#]_ on the class, if defined.
-
-With this in place, registration works as expected::
-
-    >>> Seq(int).register_instance(random_object)
-    >>> isinstance(random_object, Seq(int))
-    True
-    >>> isinstance(random_object, Seq(float))
-    False
-
-.. [#] http://www.python.org/dev/peps/pep-3119/
-.. [#] http://bugs.python.org/issue1708353
-.. [#] http://docs.python.org/reference/datamodel.html#customizing-instance-and-subclass-checks
-.. [#] Named to resemble ``__subclasshook__()``, used for ``issubclass()`` 
-   which *is* already supported (as noted earlier, before this work the two
-   were largely equivalent).
+Type specifications extend ABCs with an additional registry, used for
+instances.  This is populated by ``register_instance()`` and checked within
+``__instancehook__``.
 
 Structural Type Verification
 ............................
@@ -556,19 +557,6 @@ been invoked::
     >>> class MyIntList(list, Seq(int)): pass
     >>> isinstance(MyIntList(), Seq(float))
     False
-
-Expansion
-~~~~~~~~~
-
-Expansion is the recursive exploration of data described by a type
-specification.  A callback allows values to be processed (it receives value,
-type specification, and any available label) and can recurse on its contents,
-giving the caller control over exactly what values are "atomic".  Exceptions
-are made available to the callback by providing the data as generators.
-
-This is used to implement structural type verification: each value in turn is
-checked against the ABC registry and superclasses; if these fail then the
-value is expanded and the process repeated on the contents.
 
 Examples
 ~~~~~~~~

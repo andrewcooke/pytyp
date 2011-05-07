@@ -2,12 +2,33 @@
 from inspect import getcallargs, getfullargspec
 from functools import wraps
 
-from pytyp.spec.abcs import type_error, TypeSpecMeta
+from pytyp.spec.abcs import type_error, TSMeta
 
 
 def verify(value, spec):
-    if not isinstance(value, TypeSpecMeta._normalize(spec)):
+    if not isinstance(value, TSMeta._normalize(spec)):
         type_error(value, spec)
+        
+        
+def verify_all(callargs, annotations):
+    for name in annotations:
+        spec = annotations[name]
+        try:
+            verify(callargs.get(name), spec)
+        except AttributeError:
+            pass
+    
+        
+def unpack(func):
+    annotations = dict((name, TSMeta._normalize(spec))
+                       for (name, spec) in getfullargspec(func).annotations.items())
+    try:
+        rspec = annotations.pop('return')
+        do_return = True
+    except KeyError:
+        rspec = None
+        do_return = False
+    return (annotations, do_return, rspec)
 
 
 def checked(func):
@@ -32,21 +53,11 @@ def checked(func):
         ...
       TypeError: Type int inconsistent with 'wrong'.
     '''
+    (annotations, do_return, rspec) = unpack(func)
     @wraps(func)
     def wrapper(*args, **kargs):
         callargs = getcallargs(func, *args, **kargs)
-        annotations = dict(getfullargspec(func).annotations)
-        try:
-            rspec = annotations.pop('return')
-            do_return = True
-        except KeyError:
-            do_return = False
-        for name in annotations:
-            spec = annotations[name]
-            try:
-                verify(callargs.get(name), TypeSpecMeta._normalize(spec))
-            except AttributeError:
-                pass
+        verify_all(callargs, annotations)
         result = func(*args, **kargs)
         if do_return:
             verify(result, rspec)

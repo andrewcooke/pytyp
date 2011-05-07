@@ -2,7 +2,7 @@
 from collections import _iskeyword
 from string import whitespace
 
-from pytyp.spec.abcs import And, Cls, Rec
+from pytyp.spec.abcs import And, Ins, Rec
 from pytyp.spec.check import checked as _checked
 
 
@@ -12,7 +12,7 @@ def record(typename, field_names, verbose=False, rename=False, mutable=False,
     nds = validate_args(parse_args(field_names), rename=rename)
     template = class_template(typename, list(nds), mutable, checked, private)
     if verbose: print(template)
-    namespace = dict(property=property, checked=_checked, And=And, Cls=Cls, Rec=Rec)
+    namespace = dict(property=property, checked=_checked, And=And, Ins=Ins, Rec=Rec)
     try:
         exec(template, namespace)
     except SyntaxError as e:
@@ -31,7 +31,7 @@ def class_template(typename, nds, mutable, checked, private):
                          for (name, _, _) in nds)
     properties = '\n'.join(map(pad4, fmt_properties(nds, _dict, mutable, checked)))
     return '''
-class {typename}(Cls(Rec,{args_spec})):
+class {typename}(Ins(Rec,{args_spec})):
     """record {typename}:
 {class_doc}"""
     {checked}

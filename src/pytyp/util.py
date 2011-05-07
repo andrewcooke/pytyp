@@ -8,3 +8,4 @@ def items(obj):
         if name not in _BORING:
             yield (name, getattr(obj, name))
 
+

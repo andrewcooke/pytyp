@@ -1,8 +1,10 @@
 
-from collections import Sequence
+from collections import Sequence, Mapping, MutableMapping
 from unittest import TestCase
 
-from pytyp.spec.abcs import Seq, Rec, Alt, Opt, Cls, Any, Delayed, And, Atr, Or
+from pytyp.spec.abcs import Seq, Rec, Alt, Opt, Ins, Any, Delayed, And, Atr, Or,\
+    Product, Sum, Sub, NoNormalize, TSMeta
+from pytyp.spec.dispatch import overload
 
 
 class SeqTest(TestCase):
@@ -20,7 +22,7 @@ class SeqTest(TestCase):
         sint = Seq(int)
         sfloat = Seq(float)
         assert sint is not sfloat
-        assert sint._abc_type_arguments == ((0, Cls(int)),), sint._abc_type_arguments
+        assert sint._abc_type_arguments == ((0, Ins(int)),), sint._abc_type_arguments
         
     def test_mixin(self):
         SFloat = Seq(float)
@@ -54,7 +56,7 @@ class SeqTest(TestCase):
                 return 42
         boo = Boo([1,2,3])
         assert isinstance(boo, Sequence)
-
+        
     def test_args(self):
         try:
             Seq(int, float)
@@ -88,6 +90,10 @@ class SeqTest(TestCase):
         assert issubclass(list, Sequence)
         assert issubclass(list, Seq())
         assert not issubclass(list, Seq(int))
+        assert issubclass(tuple, Sequence)
+        assert issubclass(tuple, Seq())
+        assert not issubclass(dict, Sequence)
+        assert not issubclass(dict, Seq())
 
     def test_register(self):
         class Foo: pass
@@ -125,7 +131,7 @@ class SeqTest(TestCase):
         assert isinstance(ilist, Seq)
         
         
-class MapTest(TestCase):
+class RecTest(TestCase):
     
     def test_subclass(self):
         class Bar(dict, Rec(a=int, b=str)): pass
@@ -138,6 +144,11 @@ class MapTest(TestCase):
         assert issubclass(Bar, Rec())
         assert not issubclass(Bar, Rec(a=int, b=float))
         assert issubclass(Bar, Rec(a=int, b=str))
+        
+    def test_default(self):
+        assert isinstance({'a':1,'b':'two', 'c':'three'}, Rec(a=int, __=str))
+        assert not isinstance({'a':1,'b':'two', 'c':3}, Rec(a=int, __=str))
+        assert not isinstance({'a':1,'b':'two', 'c':'three'}, Rec(a=int))
         
     def test_register(self):
         class Baz(): pass
@@ -161,6 +172,14 @@ class MapTest(TestCase):
         assert isinstance({'a': 1}, Rec(a=int,__b=str))
         assert isinstance([1, 'two'], Rec(int,str))
         assert not isinstance([1, 2], Rec(int,str))
+        
+    def test_is_subclass(self):
+        assert issubclass(dict, Mapping)
+        assert issubclass(dict, Rec())
+        assert not issubclass(tuple, Mapping)
+        assert issubclass(tuple, Rec())
+        assert not issubclass(list, Mapping)
+        assert not issubclass(list, Rec())
         
         
 class AltTest(TestCase):
@@ -220,31 +239,31 @@ class OptTest(TestCase):
         assert not isinstance('one', Opt(int))
         
         
-class ClsTest(TestCase):
+class InsTest(TestCase):
     
     def test_class_register(self):
         class Bar: pass
         class Baz: pass
         bar = Bar()
-        assert not isinstance(bar, Cls(Baz))
-        Cls(Baz).register_instance(bar)
-        assert isinstance(bar, Cls(Baz))
+        assert not isinstance(bar, Ins(Baz))
+        Ins(Baz).register_instance(bar)
+        assert isinstance(bar, Ins(Baz))
         
-        assert issubclass(Bar, Cls(Bar))
-        assert not issubclass(Baz, Cls(Bar))
-        Cls(Bar).register(Baz)
-        assert issubclass(Baz, Cls(Bar))
+        assert issubclass(Bar, Ins(Bar))
+        assert not issubclass(Baz, Ins(Bar))
+        Ins(Bar).register(Baz)
+        assert issubclass(Baz, Ins(Bar))
         
 
     def test_structural(self):
         class Bar: pass
         bar = Bar()
-        assert isinstance(bar, Cls(Bar))
+        assert isinstance(bar, Ins(Bar))
         
     def test_inheritance(self):
-        assert issubclass(Cls(int), Cls)
-        assert issubclass(int, Cls(int))
-        assert not issubclass(int, Cls)
+        assert issubclass(Ins(int), Ins)
+        assert issubclass(int, Ins(int))
+        assert not issubclass(int, Ins)
         
         
 class AndTest(TestCase):
@@ -272,13 +291,13 @@ class AndTest(TestCase):
         ifoo = Foo(1)
         sfoo = Foo('one')
         assert isinstance(ifoo, Foo)
-        assert isinstance(sfoo, Cls(Foo))
+        assert isinstance(sfoo, Ins(Foo))
         assert isinstance(ifoo, And(Foo, Atr(x=int)))
         assert not isinstance(sfoo, And(Foo, Atr(x=int)))
         
         assert not issubclass(int, And(int, str))
         
-        assert isinstance(ifoo, Cls(Foo, x=int))
+        assert isinstance(ifoo, Ins(Foo, x=int))
         
         
 class OrTest(TestCase):
@@ -308,4 +327,62 @@ class OrderTest(TestCase):
         assert len(ordered) == 3, ordered
         
         
+class ExpandTest(TestCase):
     
+    def test_sexpr(self):
+        sexpr = Delayed()
+        sexpr.set(Alt(Seq(sexpr), Any))
+        class Count:
+            def count(self, vsn):
+                (value, spec, _) = vsn
+                try:
+                    return spec._for_each(value, self)
+                except AttributeError:
+                    return 1
+            @overload
+            def __call__(self, spec:Sub(Sum), vsn):
+                for entry in vsn:
+                    try:
+                        return self.count(entry)
+                    except TypeError:
+                        pass
+            @__call__.add
+            def __call__(self, spec, vsn):
+                return sum(map(self.count, vsn))
+        n = sexpr._for_each([1,2,[3,[4,5],6,[7]]], Count())
+        assert n == 7, n
+        
+        
+class SubTest(TestCase):
+    
+    def test_subinstance(self):
+        assert isinstance(int, Sub(Ins(int)))
+        assert isinstance(Alt(int, str), Sub(Sum))
+        assert not isinstance(Alt(int, str), Sub(Product))
+
+
+class BacktrackTest(TestCase):
+    
+    def test_verify(self):
+        def simple_verify(value, spec):
+            def check(v, s):
+                if hasattr(s, '_backtrack'):
+                    s._backtrack(v, callback)
+                else:
+                    if not isinstance(v, s):
+                        raise TypeError
+            def callback(_, vsn):
+                for (v, s, _) in vsn:
+                    check(v, s)
+            try:
+                check(value, TSMeta._normalize(spec))
+                return True
+            except TypeError:
+                return False
+        assert simple_verify(1, int)
+        assert simple_verify([1,2,3], Seq())
+        assert simple_verify(1, Opt(int))
+        assert simple_verify([1,2,None,3], Seq(Opt(int)))
+        assert not simple_verify([1,2,None,3.0], Seq(Opt(int)))
+
+

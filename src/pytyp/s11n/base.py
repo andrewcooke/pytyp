@@ -28,8 +28,8 @@
 
 from inspect import getfullargspec, getcallargs
 from collections import Callable, Iterable, Mapping
-from pytyp.spec.abcs import Atomic, Any, Rec, Seq, Cls, type_error, Alt,\
-    TypeSpecMeta
+from pytyp.spec.abcs import Atomic, Any, Rec, Seq, Ins, type_error, Alt,\
+    TSMeta
 
 
 def encode(obj, raw=Atomic, recurse=True, check_circular=True, 
@@ -173,7 +173,7 @@ def class_to_dict_spec(cls):
                     key = Rec.OptKey(name)
                 else:
                     key = name
-                newspec[key] = TypeSpecMeta._normalize(argspec.annotations[name])
+                newspec[key] = TSMeta._normalize(argspec.annotations[name])
                 names.add(name)
     # other args with default are optional
     if argspec.defaults:
@@ -215,7 +215,7 @@ def class_to_dict_spec(cls):
 
 
 def transcode(value, spec):
-    if issubclass(spec, Cls) and spec._abc_class != object:
+    if issubclass(spec, Ins) and spec._abc_class != object:
         if isinstance(value, Mapping):
             (varargs, varkw, dict_spec) = class_to_dict_spec(spec)
             new_value = transcode(value, dict_spec)
@@ -233,18 +233,18 @@ def transcode(value, spec):
         else:
             type_error(value, spec)
     elif issubclass(spec, Seq):
-        return list(spec._expand(value, lambda vsn: (transcode(v, s) for (v, s, n) in vsn)))
+        return list(spec._for_each(value, lambda c, vsn: (transcode(v, s) for (v, s, n) in vsn)))
     elif issubclass(spec, Rec):
         if spec._int_keys():
-            return tuple(spec._expand(value, 
-                        lambda vsn: (transcode(v, s) 
-                                     for (v, s, n) in sorted(vsn, 
-                                                key=lambda vsn: Rec.OptKey.unpack(vsn[2])))))
+            return tuple(spec._for_each(value, 
+                        lambda c, vsn: (transcode(v, s) 
+                                        for (v, s, n) in sorted(vsn, 
+                                            key=lambda vsn: Rec.OptKey.unpack(vsn[2])))))
         else:
-            return dict(spec._expand(value, 
-                        lambda vsn: ((n, transcode(v, s)) for (v, s, n) in vsn)))
+            return dict(spec._for_each(value, 
+                        lambda c, vsn: ((n, transcode(v, s)) for (v, s, n) in vsn)))
     elif issubclass(spec, Alt):
-        def alternative(vsn):
+        def alternative(c, vsn):
             error = None
             for (v, s, _) in vsn:
                 try:
@@ -253,7 +253,7 @@ def transcode(value, spec):
                     error = e
             raise error
         print(spec, 'is alt!', value)
-        return spec._expand(value, alternative)
+        return spec._for_each(value, alternative)
     elif isinstance(value, spec):
         return value
     else:
@@ -323,7 +323,7 @@ def decode(value, spec):
       >>> decode((None, {'a': 2}), (Opt(Container), DecExample))
       (None, <DecExample(2)>)
     '''
-    return transcode(value, TypeSpecMeta._normalize(spec))
+    return transcode(value, TSMeta._normalize(spec))
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ from pytyp.spec.abcs import *
 class NormalizeTest(TestCase):
     
     def assert_normal(self, spec, target):
-        result = TypeSpecMeta._normalize(spec)
+        result = TSMeta._normalize(spec)
         assert result == target, result 
     
     def test_delayed(self):

@@ -1,5 +1,8 @@
 
 from collections import Sequence, Mapping, MutableMapping
+from functools import reduce
+from itertools import count
+from operator import __and__
 from unittest import TestCase
 
 from pytyp.spec.abcs import Seq, Rec, Alt, Opt, Ins, Any, Delayed, And, Atr, Or,\
@@ -327,32 +330,6 @@ class OrderTest(TestCase):
         assert len(ordered) == 3, ordered
         
         
-class ExpandTest(TestCase):
-    
-    def test_sexpr(self):
-        sexpr = Delayed()
-        sexpr.set(Alt(Seq(sexpr), Any))
-        class Count:
-            def count(self, vsn):
-                (value, spec, _) = vsn
-                try:
-                    return spec._for_each(value, self)
-                except AttributeError:
-                    return 1
-            @overload
-            def __call__(self, spec:Sub(Sum), vsn):
-                for entry in vsn:
-                    try:
-                        return self.count(entry)
-                    except TypeError:
-                        pass
-            @__call__.add
-            def __call__(self, spec, vsn):
-                return sum(map(self.count, vsn))
-        n = sexpr._for_each([1,2,[3,[4,5],6,[7]]], Count())
-        assert n == 7, n
-        
-        
 class SubTest(TestCase):
     
     def test_subinstance(self):
@@ -365,24 +342,24 @@ class BacktrackTest(TestCase):
     
     def test_verify(self):
         def simple_verify(value, spec):
-            def check(v, s):
-                if hasattr(s, '_backtrack'):
-                    s._backtrack(v, callback)
-                else:
-                    if not isinstance(v, s):
-                        raise TypeError
-            def callback(_, vsn):
-                for (v, s, _) in vsn:
-                    check(v, s)
-            try:
-                check(value, TSMeta._normalize(spec))
-                return True
-            except TypeError:
-                return False
+            def check(vsn):
+                (value, spec, _) = vsn
+                try: return spec._backtrack(value, callback)
+                except TypeError: raise
+                except:
+                    if isinstance(value, spec): return True
+                    else: raise TypeError
+            callback = lambda _, vsn: True and list(map(check, vsn))
+            try: return check((value, TSMeta._normalize(spec), None))
+            except: return False
         assert simple_verify(1, int)
         assert simple_verify([1,2,3], Seq())
         assert simple_verify(1, Opt(int))
         assert simple_verify([1,2,None,3], Seq(Opt(int)))
         assert not simple_verify([1,2,None,3.0], Seq(Opt(int)))
+        assert simple_verify((1, 2), And(Seq(int), Rec(int, int)))
+        assert not simple_verify((1, 2), And(Seq(int), Rec(int, str)))
+    
+        
 
 

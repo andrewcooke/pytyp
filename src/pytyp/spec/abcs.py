@@ -149,8 +149,15 @@ class TypeSpec(ReprBase):
     '''
 
     @classmethod
-    def _structuralcheck(cls, instance):
-        return cls._for_each(instance, cls._verify)
+    def _structuralcheck(cls, instance, check=isinstance):
+        def verify(_, vsn):
+            for (v, s, _) in vsn:
+                if not check(v, s): raise TypeError
+            return True
+        try:
+            return cls._backtrack(instance, verify)
+        except TypeError:
+            return False
     
     @classmethod
     def register_instance(cls, instance):
@@ -194,6 +201,8 @@ class RecursiveType(TypeError):
 
 
 class DelayedTypeError(TypeError): pass
+
+class NoBacktrack(Exception, metaclass=ABCMeta): pass
 
 
 def expand(value, spec, callback):
@@ -239,16 +248,6 @@ def _polymorphic_subclass(bases, args, kargs):
 class Product:
     
     @classmethod
-    def _verify(cls, _, vsn, check=isinstance):
-        try:
-            for (v, s, _) in vsn:
-                if not check(v, s):
-                    return False
-            return True
-        except TypeError:
-            return False
-        
-    @classmethod
     def _backtrack(cls, value, callback):
         return callback(cls, cls._vsn(value))
     
@@ -256,25 +255,12 @@ class Product:
 class Sum:
     
     @classmethod
-    def _verify(cls, _, vsn, check=isinstance):
-        try:
-            for (v, s, _) in vsn:
-                try:
-                    if check(v, s):
-                        return True
-                except TypeError:
-                    pass
-        except TypeError:
-            pass
-        return False
-    
-    @classmethod
     def _backtrack(cls, value, callback):
         for (v, s, n) in cls._vsn(value):
             try:
                 return callback(cls, [(v, s, n)])
-            except TypeError:
-                pass
+            except Exception as e:
+                if isinstance(e, NoBacktrack): raise
         raise TypeError('No alternative for {}'.format(cls))
     
 
@@ -480,8 +466,7 @@ class Alt(Sum):
 
     @classmethod
     def __subclasshook__(cls, subclass):
-        if cls not in (Alt, Opt) and \
-                cls._for_each(subclass, lambda c, vsn: cls._verify(c, vsn, check=issubclass)):
+        if cls not in (Alt, Opt) and cls._structuralcheck(subclass, check=issubclass):
             return True
         else:
             return NotImplemented
@@ -644,7 +629,7 @@ class _Set(TypeSpec):
         if _Set is cls or _Set in cls.__bases__:
             return NotImplemented
         else:
-            return cls._for_each(subclass, lambda c, vsn: cls._verify(c, vsn, check=issubclass))
+            return cls._structuralcheck(subclass, check=issubclass) 
 
     @classmethod
     def _fmt_args(cls):

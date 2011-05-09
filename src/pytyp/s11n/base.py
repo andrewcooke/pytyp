@@ -28,8 +28,9 @@
 
 from inspect import getfullargspec, getcallargs
 from collections import Callable, Iterable, Mapping
-from pytyp.spec.abcs import Atomic, Any, Rec, Seq, Ins, type_error, Alt,\
-    TSMeta
+from pytyp.spec.abcs import Atomic, Any, Rec, Seq, Ins, type_error, Alt, \
+    TSMeta, Sub
+from pytyp.spec.dispatch import overload
 
 
 def encode(obj, raw=Atomic, recurse=True, check_circular=True, 
@@ -119,7 +120,7 @@ def encode(obj, raw=Atomic, recurse=True, check_circular=True,
     def check(name, eq, type_):
         value = getattr(obj, name)
         if isinstance(value, type_) != eq:
-            raise TypeError('{0} for {1} is {2}of type {3}'.format(
+            raise TypeError('{0} for {1} is {2} of type {3}'.format(
                     name, type(obj), '' if eq else 'not ', type_))
         if recurse:
             value = encode_(value)
@@ -211,10 +212,129 @@ def class_to_dict_spec(cls):
 # pass in a callback that (1) calls transcode for each in turn and 
 # (2) assembles the data correctly.
 
+class Transcode:
+    
+    @overload
+    def __call__(self, value, spec):
+        if isinstance(value, spec):
+            return value
+        else:
+            type_error(value, spec)
+
+    @__call__.intercept
+    def map_instance(self, value:Mapping, spec:Sub(Ins)):
+        (varargs, varkw, dict_spec) = class_to_dict_spec(spec)
+        new_value = transcode(value, dict_spec)
+        args = new_value.pop(Rec.OptKey(varargs), []) if varargs else []
+        kargs = new_value.pop(Rec.OptKey(varkw), {}) if varkw else {}
+        args.extend(new_value.pop(index) 
+                    for index in sorted(key 
+                        for key in new_value.keys() 
+                        if isinstance(Rec.OptKey.unpack(key), int)))
+        kargs.update((Rec.OptKey.unpack(key), value) 
+                     for (key, value) in new_value.items())    
+        return spec._abc_class(*args, **kargs)
+    
+    @__call__.intercept
+    def other_instance(self, value, spec:Sub(Ins)):
+        if isinstance(value, spec):
+            return value
+        else:
+            type_error(value, spec)
+            
+    @__call__.intercept
+    def sequence(self, value, spec:Sub(Seq)):
+        return list(spec._for_each(value, lambda c, vsn: (transcode(v, s) for (v, s, n) in vsn)))
+    
+    @__call__.intercept
+    def record(self, value, spec:Sub(Rec)):
+        if spec._int_keys():
+            return tuple(spec._for_each(value, 
+                        lambda c, vsn: (transcode(v, s) 
+                                        for (v, s, n) in sorted(vsn, 
+                                            key=lambda vsn: Rec.OptKey.unpack(vsn[2])))))
+        else:
+            return dict(spec._for_each(value, 
+                        lambda c, vsn: ((n, transcode(v, s)) for (v, s, n) in vsn)))
+            
+    @__call__.intercept
+    def alternative(self, value, spec:Sub(Alt)):
+        def alt(c, vsn):
+            error = None
+            for (v, s, _) in vsn:
+                try:
+                    return transcode(v, s)
+                except TypeError as e:
+                    error = e
+            raise error
+        print(spec, 'is alt!', value)
+        return spec._for_each(value, alt)
+    
+transcode = Transcode()
 
 
+class Transcode3:
+    
+    @overload
+    def __call__(self, value, spec):
+        if isinstance(value, spec):
+            return value
+        else:
+            type_error(value, spec)
 
-def transcode(value, spec):
+    @__call__.intercept
+    def map_instance(self, value:Mapping, spec:Sub(Ins)):
+        (varargs, varkw, dict_spec) = class_to_dict_spec(spec)
+        new_value = transcode3(value, dict_spec)
+        args = new_value.pop(Rec.OptKey(varargs), []) if varargs else []
+        kargs = new_value.pop(Rec.OptKey(varkw), {}) if varkw else {}
+        args.extend(new_value.pop(index) 
+                    for index in sorted(key 
+                        for key in new_value.keys() 
+                        if isinstance(Rec.OptKey.unpack(key), int)))
+        kargs.update((Rec.OptKey.unpack(key), value) 
+                     for (key, value) in new_value.items())    
+        return spec._abc_class(*args, **kargs)
+    
+    @__call__.intercept
+    def other_instance(self, value, spec:Sub(Ins)):
+        if isinstance(value, spec):
+            return value
+        else:
+            type_error(value, spec)
+            
+    @__call__.intercept
+    def sequence(self, value, spec:Sub(Seq)):
+        return list(spec._for_each(value, lambda c, vsn: (transcode3(v, s) for (v, s, n) in vsn)))
+    
+    @__call__.intercept
+    def record(self, value, spec:Sub(Rec)):
+        if spec._int_keys():
+            return tuple(spec._for_each(value, 
+                        lambda c, vsn: (transcode3(v, s) 
+                                        for (v, s, n) in sorted(vsn, 
+                                            key=lambda vsn: Rec.OptKey.unpack(vsn[2])))))
+        else:
+            return dict(spec._for_each(value, 
+                        lambda c, vsn: ((n, transcode3(v, s)) for (v, s, n) in vsn)))
+            
+    @__call__.intercept
+    def alternative(self, value, spec:Sub(Alt)):
+        def alt(c, vsn):
+            error = None
+            for (v, s, _) in vsn:
+                try:
+                    return transcode3(v, s)
+                except TypeError as e:
+                    error = e
+            raise error
+        print(spec, 'is alt!', value)
+        return spec._for_each(value, alt)
+    
+transcode3 = Transcode3()
+
+
+def transcode2(value, spec):
     if issubclass(spec, Ins) and spec._abc_class != object:
         if isinstance(value, Mapping):
             (varargs, varkw, dict_spec) = class_to_dict_spec(spec)

@@ -3,16 +3,17 @@ from collections import _iskeyword
 from string import whitespace
 
 from pytyp.spec.abcs import And, Ins, Rec
-from pytyp.spec.check import checked as _checked
+from pytyp.spec.check import checked as _checked, verify as _verify
 
 
 def record(typename, field_names, verbose=False, rename=False, mutable=False, 
-           checked=False, private=True):
+           checked=False):
     validate_name(typename)
     nds = validate_args(parse_args(field_names), rename=rename)
-    template = class_template(typename, list(nds), mutable, checked, private)
+    template = class_template(typename, list(nds), mutable, checked)
     if verbose: print(template)
-    namespace = dict(property=property, checked=_checked, And=And, Ins=Ins, Rec=Rec)
+    namespace = dict(property=property, checked=_checked, verify=_verify, 
+                     And=And, Ins=Ins, Rec=Rec)
     try:
         exec(template, namespace)
     except SyntaxError as e:
@@ -20,33 +21,43 @@ def record(typename, field_names, verbose=False, rename=False, mutable=False,
     return namespace[typename]
     
 
-def class_template(typename, nds, mutable, checked, private):
-    pad4, pad8 = left(4), left(8)
-    args_spec = ','.join('{}={}'.format(name, spec) for (name, _, spec) in nds)
+def class_template(typename, nds, mutable, checked):
+    pad4, pad8, pad12 = left(4), left(8), left(12)
+    args_specs = ','.join('{}={}'.format(name, spec) for (name, _, spec) in nds)
+    class_specs = '{' + ','.join(fmt_class_specs(nds)) + '}'
     class_doc = '\n'.join(map(pad8, fmt_init_args(nds)))
     checked = '@checked' if checked else ''
-    _dict = '__dict' if private else '_dict'
+    verify = pad8('else: verify(value, self.__specs[name])') if checked else ''
     init_args = ', '.join(fmt_init_args(nds))
-    init_set = '\n'.join(pad8('self.{_dict}["{name}"] = {name}'.format(_dict=_dict, name=name))
+    init_set = '\n'.join(pad8('self.__dict["{name}"] = {name}'.format(name=name))
                          for (name, _, _) in nds)
-    properties = '\n'.join(map(pad4, fmt_properties(nds, _dict, mutable, checked)))
+    properties = '\n'.join(map(pad4, fmt_properties(nds, mutable)))
     return '''
-class {typename}(Ins(Rec,{args_spec})):
+class {typename}(Ins(Rec,{args_specs})):
     """record {typename}:
 {class_doc}"""
+    __specs = {class_specs}
     {checked}
     def __init__(self, {init_args}):
-        self.{_dict} = {{}}
+        self.__dict = {{}}
 {init_set}
-    def __getitem__(name):
-        return self.{_dict}[name]
-    def __setitem__(name, value):
-        setattr(self, name, value)
+        self.__locked = True
+    def __getitem__(self, name):
+        return self.__dict[name]
+    def __setitem__(self, name, value):
+        if name not in self.__specs:
+            raise TypeError('Record {{}} does not exist'.format(name))
+{verify}            
+        self.__dict[name] = value
 {properties}
-    def _replace(**kargs):
-        state = dict(self.{_dict})
+    def _replace(self, **kargs):
+        state = dict(self.__dict)
         state.update(kargs)
         return {typename}(**state)
+    def __setattr__(self, name, value):
+        if hasattr(self, '_{typename}__locked'):
+            self.__setitem__(name, value)
+        super().__setattr__(name, value)
 '''.format(**locals())
 
 
@@ -55,6 +66,11 @@ def left(n):
     def padder(line):
         return pad + line
     return padder
+
+
+def fmt_class_specs(nds):
+    for (name, _, spec) in nds:
+            yield '"{name}":{spec}'.format(**locals())
 
 
 def fmt_init_args(nds):
@@ -66,16 +82,14 @@ def fmt_init_args(nds):
             yield '{name}:{spec}={default}'.format(**locals())
 
 
-def fmt_properties(nds, _dict, mutable, checked):
+def fmt_properties(nds, mutable):
     for (name, default, spec) in nds:
         p = property()
         yield '@property'
-        if checked: yield '@checked'
-        yield 'def {name}(self) -> {spec}: return self.{_dict}[""]'.format(**locals())
+        yield 'def {name}(self) -> {spec}: return self.__dict["{name}"]'.format(**locals())
         if mutable:
             yield '@{name}.setter'.format(**locals())
-            if checked: yield '@checked'
-            yield 'def {name}(self, value:{spec}): self.{_dict}["{name}"] = value'.format(**locals())
+            yield 'def {name}(self, value:{spec}): self.__dict["{name}"] = value'.format(**locals())
         
         
 def parse_args(args):

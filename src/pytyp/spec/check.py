@@ -6,7 +6,8 @@ from pytyp.spec.abcs import type_error, TSMeta
 
 
 def verify(value, spec):
-    if not isinstance(value, TSMeta._normalize(spec)):
+    spec = TSMeta._normalize(spec)
+    if not isinstance(value, spec):
         type_error(value, spec)
         
         

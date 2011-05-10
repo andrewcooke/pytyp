@@ -68,7 +68,7 @@ class TSMeta(ABCMeta):
         >>> TSMeta._normalize([int])
         Seq(int)
         >>> TSMeta._normalize([])
-        Seq
+        Seq(Ins(object))
         >>> Seq([int])
         Seq(Seq(int))
         >>> TSMeta._normalize(int)
@@ -114,6 +114,8 @@ class TSMeta(ABCMeta):
             return cls._reprhook()
         except AttributeError:
             return super().__repr__()
+        
+normalize = TSMeta._normalize
             
     
 class NoStructural():
@@ -633,7 +635,7 @@ class _Set(TypeSpec):
 
     @classmethod
     def _fmt_args(cls):
-        return ','.join(spec for (_, spec) in cls._abc_type_arguments)
+        return ','.join(str(spec) for (_, spec) in cls._abc_type_arguments)
 
 
 class And(Product, _Set):

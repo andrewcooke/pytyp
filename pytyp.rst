@@ -69,7 +69,7 @@ semantics extend the ABC approach with registration of instances and nested
 iteration over values and types.  The latter allows piecewise verification of
 values that cannot be registered.
 
-The approach tries to be "pythonic": it adds type–related metadata to prgrams
+The approach tries to be "pythonic": it adds type–related metadata to programs
 that can be used at run–time; this is optional, and builds on existing
 concepts.  As with ABCs, correct use is not enforced by a static type system;
 no attempt is made to resolve conflicting specifications.
@@ -122,10 +122,15 @@ Python.  For example, the ``Sequence`` ABC, might be extended to
 ``Sequence(int)`` to describes sequences of integers.  These "parametric ABCs"
 could support registration of instances as well as classes; for mutable
 containers that do not support hashing (and so cannot be registered)
-introspective, structural verification might also be possible::
+introspective, structural verification might also be possible [#]_::
 
     >>> isinstance([1,2,None,4], Sequence(Option(int)))
     True
+
+.. [#] This particular example is not a valid ``pytyp`` specification.  For
+   practical reasons (the need to introduce a new metaclass, and the
+   difficulty in modfying existing ABCs) the final library uses
+   ``Seq(Opt(int))``.
 
 A concete implementation of all this (and more!) is given in `The Pytyp
 Library`_ (and `Appendix: Further Details`_).
@@ -202,12 +207,18 @@ Recent work extended the language in two interesting ways.
 First, it addressed the conflict described above: on the one hand, programmers
 behave as though Python's runtime behaviour can be reliably explained in terms
 of types; on the other, the runtime functions in terms of available
-attributes.  Abstract Base Classes (ABCs) resolve this by identifying
+attributes.  **Abstract Base Classes (ABCs) resolve this by identifying
 collections of attributes, providing a class–like abstraction that is better
-suited to duck typing.
+suited to duck typing.**
 
-However, Python still does not support the runtime *verification* of arbitrary
-duck types [#]_::
+In more detail: a programmer can identify a set of attributes, create an ABC
+that contains these, and then either subclass, or call the ``register()``
+method, to associate a class with the ABC.  The metaclass for ABCs,
+``ABCMeta``, then modifies the behaviour of ``is­inst­ance()`` and
+``is­sub­class()`` to expose this relationship at runtime.
+
+It is important to understand that Python does not support the runtime
+*verification* of arbitrary duck types [#]_::
 
   >>> class MyAbc(metaclass=ABCMeta):
   ...     @abstractmethod
@@ -222,9 +233,9 @@ duck types [#]_::
    ``Callable``.
 
 Instead, ``MyExample`` must either subclass ``MyAbc`` or register itself
-(populating a lookup table used by ``isinstance()``).  **The ABC acts only as
-a marker that signals the veracity of the registered (or subclass) type; it
-does not perform a runtime check of the attributes** [#]_.
+(populating a lookup table used by ``isinstance()``).  The ABC acts only as a
+marker that signals the veracity of the registered (or subclass) type; it does
+not perform a runtime check of the attributes [#]_.
 
 .. [#] This isn't completely true; when used with inheritance it is possible
    for ABCs to define abstract methods, which concrete implementations must
@@ -243,6 +254,9 @@ Type annotations are not interpreted or enforced by the language runtime.
 They are added to the function metadata and exposed through Python's
 ``inspect`` package.
 
+When used with ABCs, **type annotations associate variables with type–related
+metadata.**
+
 Summary 
 ~~~~~~~
 
@@ -253,8 +267,12 @@ of object attributes.
 Recent work has started to build on this foundation by reifying collections of
 attributes (ABCs) and allowing metdata (formatted in a manner traditionally
 associated with types) to be specified on functions.  However, ABCs act only
-as an unverified marker; they do not perform any runtime checks.  Nor are type
-annotations verified.
+as an unverified marker; runtime checks are restricted to a few special cases.
+Nor are type annotations verified.
+
+So **ABCs are type metadata;** ``isinstance()``, **via** ``ABCMeta``,
+**associates type metadata with values; type annotations associate type
+metadata with variables.** The rest of this paper builds on this.
 
 Discussion
 ----------
@@ -376,7 +394,10 @@ But there are some problems relating this to Python:
   described in the Appendix).
 
 * Class attributes can also look like products, but use ``__get­attr__()``
-  rather than ``__get­item__()``.  This is described using ``Atr()`` [#]_.
+  rather than ``__get­item__()``.  This is described using ``Atr()`` [#]_.  To
+  avoid the need to specify all attributes on a class, ``Atr()`` is open to
+  additional entries (unlike ``Rec()``, which is closed unless ``__`` is used
+  to specify a default type).
 
 .. [#] ``Atr()`` has an advantage over ``Rec()``: it does not require
    dependent types when reduced to ABCs with type annotations because each
@@ -479,13 +500,6 @@ attributes.
 Registration with ABCs (or subclassing) is more promising, but cannot handle
 all cases, even if extended to include instances; a general solution would
 also require a structural (piecewise inspection) approach.
-
-In fact, **registration / subclassing and structural inspection are
-complementary**: the traditional ABC approach would work well for user-defined
-classes; structural verification would be better suited to the built–in
-container types.  There would be a trade–off between convenience and speed:
-where necessary built–in containers could be replaced by immutable, registered
-custom classes.
 
 The ``Pytyp`` Library
 ---------------------
@@ -791,14 +805,6 @@ left to the client, or supported within the type library.
 ``Pytyp`` uses iteration to provide structural verification of types and the
 guided conversion of JSON data to Python classes.
 
-Although type annotations are not used in the implementation [#]_ they do play
-an important role when the library is used, associating variables with type
-specifications.
-
-.. [#] Despite my intial impression, described at the start of `Discussion`_,
-   that type specifications would be syntactic sugar for a system based on
-   type annotations for attributes within ABCs.
-
 Pythonic
 ~~~~~~~~
 
@@ -826,10 +832,15 @@ by "concreteness".
 Type Annotations
 ................
 
-These are less central to this work than I expected.  This is largely because
-**generators — which are particularly important for collections — do not allow
-for type annotations**.  This makes it difficult to extend ABCs with
-annotations in a consistent way.
+When developing ``pytyp`` my initial intention was for type specifications to
+be syntactic sugar that add type annotations to ABCs.  This would make the
+type parameters "readable" to other code.  Instead, the current implementation
+stores the parameters in dynamically generated ABCs.
+
+So type annotations are less central to this work than I expected.  This is
+largely because **generators — which are particularly important for
+collections — do not allow for type annotations**.  This makes it difficult to
+extend ABCs with annotations in a consistent way.
 
 The significance of the need for dependent types, when describing ``Rec()``
 with ABCs and type annotations, is debatable.  While type specifications are
@@ -868,11 +879,10 @@ collections of fixed size**.  ``Pytyp`` adds ``record``, similar to
 
 The inability to register common collection types because they are mutable
 (and so cannot be hashed) makes inefficient structural verification of types
-necessary.  **An efficient, simple way to either "freeze" collections or have
-temporary hashes would be very useful** [#]_.
+necessary.  An efficient, simple way to either "freeze" collections or have
+temporary hashes would be very useful [#]_.
 
-.. [#] These might function in a similar way to weak references, expiring when
-   contents — or content types — change.
+.. [#] But, I suspect, impossible to implement efficiently.
 
 More generally, functional programming suggests that accurately tracking
 mutability is important, but the runtime information for mutable types in
@@ -911,8 +921,8 @@ the "unexpected path" handling of a JIT compiler?
 Not a Type System
 .................
 
-**``Pytyp`` is not a type system; it does not support static reasoning about
-program correctness.** It is *only* a format for expressing and interpreting
+``Pytyp`` **is not a type system; it does not support static reasoning about
+program correctness.** It is *only* a library for expressing and interpreting
 metadata at run–time.  This fits within the Python ethos, but means, for
 example, that inconsistencies and errors are not flagged to the user, nor is
 the current type known for a value that has several alternatives (sum types).
@@ -945,35 +955,12 @@ Inheritance, Types as Sets
 
 It has already been noted (in `Types as Sets`_) that ``Or()`` is very close in
 meaning to ``Alt()``.  Since ``And()`` is similar to inheritance it may be
-better to drop both of these constructions.  This would reduce the number of
-concepts, but makes the library harder to use: the DSL approach to describing
-data is compact and readable; requiring the user to define new classes instead
-of writing ``And()`` makes using the library much more intrusive.
+better to drop both.  This would simplify the library, but make it harder to
+use: the DSL approach to describing data is compact and readable; requiring
+the user to define new classes instead of writing ``And()`` makes it much more
+intrusive.
 
 .. [#] The same logic might be implemented in the ``TSMeta`` metaclass.
-
-Functions
-.........
-
-``Pytyp`` was motivated by data processing and **type specifications do not
-include functions**.
-
-In applications where functions are used — for example, in the constructors of
-classes when mapping from JSON to Python — it has been sufficient to place
-type specifications in the annotations.
-
-So the `JSON Decoding`_ example above uses the annotation::
-
-    def __init__(self, *examples:[Example]):
-
-which is found by intrsopection on ``Con­tainer``, passed to
-``make­_loads()``, rather than, say::
-
-    loads = make_loads(And(Container, 
-                   Fun(__init__, examples=[Example])))
-
-A distributed approach using type annotations is natural and compact here, but
-may not be suitable in all cases.
 
 Acknowledgments
 ---------------
@@ -992,15 +979,8 @@ subclass of ``type``::
 
     >>> isinstance([1,2,3], normalize([int]))
     True
-    >>> isinstance([{'a':1, 'b':'two'}], 
-    ...            Seq({'a':int, 'b':str}))
-    True
-    >>> fmt(normalize([int, str]))
-    'Rec(0=int,1=str)'
-
-The ``fmt()`` function is needed because ``__repr__`` on classes is retrieved
-from the metaclass, which must be ``ABCMeta`` for inter–operation with
-existing classes.
+    >>> normalize([int, str])
+    Rec(0=int,1=str)
 
 Optional Records
 ~~~~~~~~~~~~~~~~
@@ -1015,19 +995,26 @@ values make certain names optional)::
     ...            Rec(a=int, __b=str))
     True
 
+Similarly, a double underscore with no following name indicates a default type
+for additional values:
+
+    >>> isinstance({'num':42, 'a':'foo', 'b':'bar'},
+    ...            Rec(num=int, __=str))
+    True
+
 .. [#] It is hard to find something that is readable, an acceptable parameter
    name, and unlikely to clash with existing code.
 
 To avoid syntax–related restrictions, ``Rec()`` can take a ``dict`` as a
-direct argument, via the ``_dict`` parameter, and then ``Rec.­Opt­Key()`` can
+direct argument, via the ``_dict`` parameter.  ``Rec.­Opt­Key()`` can then
 mark optional records::
 
     >>> isinstance({1:1}, 
-    ...            Rec(_dict={1:int, Rec.OptKey(2):str}))
+    ...            Rec(_dict={1:int, Rec.OptKey('b'):str}))
     True
 
-Class Instance Shorthand
-~~~~~~~~~~~~~~~~~~~~~~~~
+Class and Attributes Shorthand
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``Ins()`` constructor provides a shorthand for specifications that include
 a class and attributes::
@@ -1039,8 +1026,8 @@ a class and attributes::
     True
     >>> isinstance(Foo('one'), Ins(Foo, x=int))
     False
-    >>> fmt(Ins(Foo, x=int))
-    'And(Ins(Foo),Atr(x=int))'
+    >>> Ins(Foo, x=int)
+    And(Ins(Foo),Atr(x=int))
 
 Circular References
 ~~~~~~~~~~~~~~~~~~~
@@ -1050,19 +1037,18 @@ it is known::
 
     >>> d = Delayed()
     >>> d.set(Alt(int, d, str))
-    >>> fmt(d)
-    'Delayed(Alt(0=int,1=...,2=str))'
+    >>> d
+    Delayed(Alt(0=int,1=...,2=str))
 
-``isinstance()`` will raise ``RecursiveType`` exception on recursive
-verification of a recursive type (typically this is handled by ``Alt()`` which
-will attempt another alternative).
+``isinstance()`` will raise a ``RecursiveType`` exception on recursive
+verification of a recursive type (typically this is handled by backtracking in
+``Alt()``).
 
 Dynamic Dispatch and Iteration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Iteration...
-
-For example::
+While developing ``pytyp`` I made various experiments with type dispatch.  The
+most readable had the following form::
 
     >>> sexpr = Delayed()
     >>> sexpr.set(Alt(Seq(sexpr), Any))
@@ -1076,11 +1062,11 @@ For example::
     ...         except TypeError:
     ...             return 1
     ...
-    ...     @multimethod
-    ...     def __call__(self, spec:Sub(Product), vsn):
+    ...     @overload
+    ...     def __call__(self, spec, vsn):
     ...         return sum(map(self.count, vsn))
     ...
-    ...     @__call__.mm
+    ...     @__call__.intercept
     ...     def __call__(self, spec:Sub(Sum), vsn):
     ...         for entry in vsn:
     ...             try:
@@ -1089,23 +1075,24 @@ For example::
     ...                 pass
 
     >>> sexpr._for_each([1,2,[3,[4,5],6,[7]]], Count())
+    7
 
+The ``__call__`` method is marked with the ``overload`` decorator and provides
+the default case.  Alternative cases, with the same arguments, but different
+type annotations, can then "intercept" the call to that method, to provide
+results specific to the restricted argument types.
 
-Dispatch by Type
-~~~~~~~~~~~~~~~~
+A better solution for this particular example, however, would use the
+backtracking support that ``pytyp`` already provides::
 
-I don't have a convincing example for this [#]_, but since it is easy to
-implement::
-
-    >>> Alt(a=int, b=str)._on(42,
-    ...                       a=lambda _: 'an integer',
-    ...                       b=lambda _: 'a string')
-    'an integer'
-
-.. [#] ``Pytyp`` includes an example with a typed module for a binary tree,
-   similar to ML, including dispatch by type.  Like the proverbial dancing
-   bear, the amazing thing is not how well it performs, but that it can do so
-   at all.
+    >>> def count(_, vsn):
+    ...     try:
+    ...         return sum(s._backtrack(v, count) 
+    ...                    for (v, s, _) in vsn)
+    ...     except AttributeError:
+    ...         return 1
+    >>> sexpr._backtrack([1,2,[3,[4,5],6,[7]]], count)
+    7
 
 Record
 ~~~~~~
@@ -1113,8 +1100,3 @@ Record
 In a similar manner to ``namedtuple()``, the function ``record()`` constructs
 classes that implement both ``Rec()`` and ``Atr()``, providing unified access
 to named values.
-
-And, Or
-~~~~~~~
-
-Wrong?

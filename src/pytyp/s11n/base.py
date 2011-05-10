@@ -267,7 +267,6 @@ class Transcode:
                 except TypeError as e:
                     error = e
             raise error
-        print(spec, 'is alt!', value)
         return spec._for_each(value, alt)
     
 transcode = Transcode()
@@ -328,7 +327,6 @@ class Transcode3:
                 except TypeError as e:
                     error = e
             raise error
-        print(spec, 'is alt!', value)
         return spec._for_each(value, alt)
     
 transcode3 = Transcode3()
@@ -372,7 +370,6 @@ def transcode2(value, spec):
                 except TypeError as e:
                     error = e
             raise error
-        print(spec, 'is alt!', value)
         return spec._for_each(value, alternative)
     elif isinstance(value, spec):
         return value

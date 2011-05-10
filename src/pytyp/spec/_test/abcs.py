@@ -256,7 +256,6 @@ class InsTest(TestCase):
         assert not issubclass(Baz, Ins(Bar))
         Ins(Bar).register(Baz)
         assert issubclass(Baz, Ins(Bar))
-        
 
     def test_structural(self):
         class Bar: pass
@@ -267,6 +266,12 @@ class InsTest(TestCase):
         assert issubclass(Ins(int), Ins)
         assert issubclass(int, Ins(int))
         assert not issubclass(int, Ins)
+        
+    def test_attributes(self):
+        class Foo: pass
+        assert Ins(Foo, x=int) == And(Ins(Foo), Atr(x=int)), Ins(Foo, x=int)
+        r = repr(Ins(Foo, x=int))
+        assert r == "And(Atr(x=int),Ins(Foo))", r
         
         
 class AndTest(TestCase):

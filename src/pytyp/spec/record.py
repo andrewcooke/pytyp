@@ -12,12 +12,13 @@ RESIZE = '__'
 
 def record(typename, field_names, verbose=False, mutable=False, checked=True,
            context=None):
-    if context is None: context = abcs.__dict__
-    nsd = parse_args(field_names, context)
+    _context = dict(abcs.__dict__)
+    if context: _context.update(context)
+    nsd = parse_args(field_names, _context)
     template = class_template(typename, nsd, mutable, checked)
     if verbose: print(template)
     namespace = dict(property=property, checked=_checked, verify=_verify)
-    namespace.update(context)
+    namespace.update(_context)
     try:
         exec(template, namespace)
     except SyntaxError as e:
@@ -35,9 +36,7 @@ def class_template(typename, nsd, mutable, checked):
     init_args = ', '.join(fmt_init_args(nsd))
     init_set = '\n'.join(map(pad8, fmt_init_set(nsd)))
     properties = '\n'.join(map(pad4, fmt_properties(nsd, mutable)))
-    block_mutable_dict = ''
-    return '''
-class {typename}(dict, {typespec}):
+    return '''class {typename}(dict, {typespec}):
     """
     record {typename}:
 {class_doc}
@@ -60,9 +59,7 @@ class {typename}(dict, {typespec}):
     def __setattr__(self, name, value):
         if hasattr(self, '_{typename}__lock'):
             self.__setitem__(name, value)
-        super().__setattr__(name, value)
-{block_mutable_dict}
-'''.format(**locals())
+        super().__setattr__(name, value)'''.format(**locals())
 
 
 def left(n):
@@ -91,9 +88,12 @@ def fmt_typespec(nsd):
             if isinstance(name, int):
                 yield '{}={}'.format(to_arg(name), spec)
         for (name, (spec, _)) in nsd.items():
-            if not isinstance(name, int):
+            if not isinstance(name, int) and name != RESIZE:
                 yield '{}={}'.format(name, spec)
-    return 'And(Rec({}),Atr({}))'.format(','.join(fmt_rec()), ','.join(fmt_atr()))
+    if len(nsd) - (1 if RESIZE in nsd else 0):
+        return 'And(Rec({}),Atr({}))'.format(','.join(fmt_rec()), ','.join(fmt_atr()))
+    else:
+        return 'Rec({})'.format(','.join(fmt_rec()))
 
 
 def fmt_class_specs(nsd):
@@ -131,7 +131,7 @@ def fmt_init_set(nsd):
     for (name, (_, _)) in nsd.items():
         if name != RESIZE:
             yield 'kargs[{name!r}] = {arg}'.format(arg=to_arg(name), name=name)
-    yield 'super().__init__(**kargs)'
+    yield 'super().__init__(kargs)'
     
 
 def fmt_properties(nsd, mutable):

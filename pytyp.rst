@@ -55,7 +55,7 @@ describe the data.  The end result stays true to the idea that Python is
 describes the code in the Hg repo at http://code.google.com/p/pytyp/)
 
 :Author: Andrew Cooke (andrew@acooke.org)
-:Version: 0.16 of 09-05-2011
+:Version: 0.17 of 11-05-2011
 
 Abstract
 --------
@@ -1093,9 +1093,9 @@ backtracking support that ``pytyp`` already provides::
 Record
 ~~~~~~
 
-In a similar manner to ``namedtuple()``, the function ``record()`` constructs
-classes that implement both ``Rec()`` and ``Atr()``, providing unified access
-to named values::
+In a similar manner to ``namedtuple()``, the function ``record()`` extends
+``dict`` to construct classes that implement both ``Rec()`` and ``Atr()``,
+providing unified access to named values::
 
     >>> Simple = record('Simple', 'a,b,c=3')
     >>> simple = Simple(1,'two')
@@ -1114,3 +1114,9 @@ to named values::
       ...
     TypeError: Type str inconsistent with 3.
 
+    >>> StrTuple = record('StrTuple', ':str,:str')
+    >>> stuple = StrTuple('foo','bar')
+    >>> stuple[0]
+    'foo'
+    >>> stuple._1
+    'bar'

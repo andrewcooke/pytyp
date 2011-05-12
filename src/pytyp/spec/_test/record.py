@@ -103,3 +103,12 @@ class RecordTest(TestCase):
             assert False, 'Expected error'
         except TypeError:
             pass
+
+    def test_str_tuple(self):
+        StrTuple = record('StrTuple', ':str,:str')
+        stuple = StrTuple('foo', 'bar')
+        
+    def test_int_list(self):
+        IntList = record('IntList', '__:int', mutable=True, verbose=True)
+        ilist = IntList(0,1,2)
+        

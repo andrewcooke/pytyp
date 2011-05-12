@@ -5,7 +5,7 @@ from itertools import count
 from operator import __and__
 from unittest import TestCase
 
-from pytyp.spec.abcs import Seq, Rec, Alt, Opt, Ins, Any, Delayed, And, Atr, Or,\
+from pytyp.spec.abcs import Seq, Rec, Alt, Opt, Ins, ANY, Delayed, And, Atr, Or,\
     Product, Sum, Sub, NoNormalize, TSMeta
 from pytyp.spec.dispatch import overload
 
@@ -116,13 +116,13 @@ class SeqTest(TestCase):
         assert not isinstance(1, Seq(int))
         assert not isinstance([1,'two'], Seq(int))
         assert isinstance([1, None], Seq(Opt(int)))
-        assert isinstance([1, None, 'three'], Seq(Any))
+        assert isinstance([1, None, 'three'], Seq(ANY))
         
     def test_loop(self):
         d = Delayed()
         d2 = Alt(int, d, str)
         d.set(d2)
-        assert repr(d) == 'Delayed(Alt(0=int,1=...,2=str))', repr(d)
+        assert repr(d) == 'Delayed(Alt(int,...,str))', repr(d)
         assert isinstance(1, d)
         assert isinstance('two', d)
         
@@ -325,7 +325,7 @@ class OrTest(TestCase):
 class AnyTest(TestCase):
     
     def test_int(self):
-        assert isinstance(1, Any)
+        assert isinstance(1, ANY)
         
 
 class OrderTest(TestCase):

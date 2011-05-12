@@ -29,7 +29,7 @@
 from unittest import TestCase
 from collections import namedtuple
 
-from pytyp.spec.abcs import Opt, Alt, Any, Rec
+from pytyp.spec.abcs import Opt, Alt, ANY, Rec
 from pytyp.spec.check import verify
 from pytyp._test.support import SimpleArgs
 
@@ -60,12 +60,12 @@ class verifyTest(TestCase):
         self.assert_error(lambda:verify(SimpleArgs, 'a'))
     
     def test_polymorphic(self):
-        verify('a', Any)
-        verify(1, Any)
-        verify([1,2], Any)
-        verify({1:2}, Any)
-        verify(object(), Any)
-        verify(SimpleArgs(1,2,3), Any)
+        verify('a', ANY)
+        verify(1, ANY)
+        verify([1,2], ANY)
+        verify({1:2}, ANY)
+        verify(object(), ANY)
+        verify(SimpleArgs(1,2,3), ANY)
     
     def test_maybe(self):
         verify(None, Opt(str))
@@ -82,8 +82,8 @@ class verifyTest(TestCase):
         verify([1,2,3], [int])
         verify([], [int])
         verify([1,None,3], [Opt(int)])
-        verify([1,2,3], Any)
-        verify([1,2,3], [Any])
+        verify([1,2,3], ANY)
+        verify([1,2,3], [ANY])
         self.assert_error(lambda: verify([1,'two',3], [int]))
         verify([1,2,3], [])
         verify([1,'two'], [int,str])

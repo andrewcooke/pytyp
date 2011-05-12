@@ -28,7 +28,7 @@
 
 from inspect import getfullargspec, getcallargs
 from collections import Callable, Iterable, Mapping
-from pytyp.spec.abcs import Atomic, Any, Rec, Seq, Ins, type_error, Alt, \
+from pytyp.spec.abcs import Atomic, ANY, Rec, Seq, Ins, type_error, Alt, \
     TSMeta, Sub
 from pytyp.spec.dispatch import overload
 
@@ -180,7 +180,7 @@ def class_to_dict_spec(cls):
     if argspec.defaults:
         for name in argspec.args[-len(argspec.defaults):]:
             if name not in names:
-                newspec[Rec.OptKey(name)] = Any
+                newspec[Rec.OptKey(name)] = ANY
             else:
                 newspec[Rec.OptKey(name)] = newspec.pop(name)
             names.add(name)
@@ -188,21 +188,21 @@ def class_to_dict_spec(cls):
     if argspec.args:
         for name in argspec.args:
             if name not in names and name != 'self':
-                newspec[name] = Any
+                newspec[name] = ANY
                 names.add(name)
     if argspec.kwonlyargs:
         for name in argspec.kwonlyargs:
             if name not in names:
                 if argspec.kwonlydefaults and name in argspec.kwonlydefaults:
-                    newspec[Rec.OptKey(name)] = Any
+                    newspec[Rec.OptKey(name)] = ANY
                 else:
-                    newspec[name] = Any
+                    newspec[name] = ANY
                 names.add(name)
     # *args and **kargs are optional
     if argspec.varargs and argspec.varargs not in names:
-        newspec[Rec.OptKey(argspec.varargs)] = Any
+        newspec[Rec.OptKey(argspec.varargs)] = ANY
     if argspec.varkw and argspec.varkw not in names:
-        newspec[Rec.OptKey(argspec.varkw)] = Any
+        newspec[Rec.OptKey(argspec.varkw)] = ANY
     return (argspec.varargs, argspec.varkw, Rec(_dict=newspec))
 
 

@@ -62,9 +62,9 @@ class TSMeta(ABCMeta):
         >>> TSMeta._normalize({'a': int})
         Rec(a=int)
         >>> TSMeta._normalize((int, str))
-        Rec(0=int,1=str)
+        Rec(int,str)
         >>> TSMeta._normalize(Rec((int,), {'a':str}))
-        Rec(0=Rec(0=int),1=Rec(a=str))
+        Rec(Rec(int),Rec(a=str))
         >>> TSMeta._normalize([int])
         Seq(int)
         >>> TSMeta._normalize([])
@@ -77,13 +77,13 @@ class TSMeta(ABCMeta):
         >>> TSMeta._normalize(Foo)
         Ins(Foo)
         >>> TSMeta._normalize(Alt(int, str))
-        Alt(0=int,1=str)
+        Alt(int,str)
         >>> TSMeta._normalize(Alt(int, Foo))
-        Alt(0=int,1=Ins(Foo))
+        Alt(int,Ins(Foo))
         >>> TSMeta._normalize(Opt([int]))
         Opt(Seq(int))
         >>> TSMeta._normalize([int, str])
-        Rec(0=int,1=str)
+        Rec(int,str)
         '''
         if isinstance(spec, list):
             if not spec:
@@ -213,13 +213,29 @@ def expand(value, spec, callback):
     
 def type_error(value, spec):
     raise TypeError('Type {1} inconsistent with {0!r}.'.format(value, spec))
-        
+
+
+def _sort_key(key):
+    key = Rec.OptKey.unpack(key)
+    if isinstance(key, int):
+        return key - 10000 # no maxint in python 3
+    else:
+        return abs(hash(key))
+    
         
 def _hashable_types(args, kargs):
+    '''
+    Given a list of args and kargs, both of which are type specifications,
+    generate a tuple of that information that is sorted so that it can be used as
+    a reliable key for the same information (ie normalized and ordered).
+    
+    Also, order the args (indexed specs) before the kargs so that generating 
+    the repr can handle them correctly.
+    '''
     types = dict((name, TSMeta._normalize(karg)) for (name, karg) in kargs.items())
     for (index, arg) in zip(count(), args):
         types[index] = TSMeta._normalize(arg)
-    return tuple((key, types[key]) for key in sorted(types.keys()))
+    return tuple((key, types[key]) for key in sorted(types.keys(), key=_sort_key))
 
 
 def _unhashable_types(types):
@@ -300,8 +316,24 @@ class Seq(Product):
     def _fmt_args(cls):
         return cls._abc_type_arguments[0][1]
 
+
+class FmtArgsMixin:
     
-class Rec(Product):
+    @classmethod
+    def _fmt_args(cls):
+        def args():
+            count = 0
+            for (name, spec) in cls._abc_type_arguments:
+                if name == count and count > -1:
+                    count += 1
+                    yield str(spec)
+                else:
+                    count = -1
+                    yield '{0}={1}'.format(name, spec)
+        return ','.join(args())
+
+    
+class Rec(Product, FmtArgsMixin):
     
     _abc_polymorphic_cache = {}
     
@@ -346,11 +378,9 @@ class Rec(Product):
     def __new__(cls, *args, _dict=None, **kargs):
         if cls is Rec: # check args only when being used as a class factory
             if _dict: kargs.update(_dict) 
-            if kargs and args:
-                raise TypeError('Map requires named or unnamed arguments, but not both')
             kargs = dict((Rec.OptKey.pack(name), arg) for (name, arg) in kargs.items())
             spec = _polymorphic_subclass((cls, Container), args, kargs)
-            if args:
+            if args or kargs:
                 Rec().register(spec)
             return spec
         else:
@@ -394,13 +424,8 @@ class Rec(Product):
                 return False
         return True
 
-    @classmethod
-    def _fmt_args(cls):
-        return','.join('{0}={1}'.format(name, spec)
-                       for (name, spec) in cls._abc_type_arguments)
 
-
-class Atr(Product):
+class Atr(Product, FmtArgsMixin):
     
     _abc_polymorphic_cache = {}
     
@@ -431,13 +456,8 @@ class Atr(Product):
             for (name, attr) in items(value):
                 yield (attr, None, name)
 
-    @classmethod
-    def _fmt_args(cls):
-        return ','.join('{0}={1}'.format(name, spec)
-                        for (name, spec) in cls._abc_type_arguments)
 
-
-class Alt(Sum):
+class Alt(Sum, FmtArgsMixin):
     
     # this makes no sense as a mixin - it exists only to specialise the 
     # functionality provided by the Polymorphic factory above (ie to hold 
@@ -472,11 +492,6 @@ class Alt(Sum):
             return True
         else:
             return NotImplemented
-
-    @classmethod
-    def _fmt_args(cls):
-        return ','.join('{0}={1}'.format(name, spec)
-                        for (name, spec) in cls._abc_type_arguments)
 
     @classmethod
     def _on(cls, value, **choices):
@@ -555,7 +570,7 @@ class Ins(Product):
         else:
             return spec
     
-Any = Ins()
+ANY = Ins()
 
 
 class Sub(ReprBase):

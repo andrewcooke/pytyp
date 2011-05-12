@@ -1,7 +1,7 @@
 
 from unittest import TestCase
 
-from pytyp.spec.abcs import Delayed, Alt, Seq, Any, Sub, Sum
+from pytyp.spec.abcs import Delayed, Alt, Seq, ANY, Sub, Sum
 from pytyp.spec.dispatch import overload
 
 
@@ -9,7 +9,7 @@ class ExpandTest(TestCase):
     
     def test_sexpr(self):
         sexpr = Delayed()
-        sexpr.set(Alt(Seq(sexpr), Any))
+        sexpr.set(Alt(Seq(sexpr), ANY))
         
         class Count:
             

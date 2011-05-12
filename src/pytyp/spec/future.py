@@ -2,7 +2,7 @@
 
 from pytyp.spec.check import verify
 from pytyp.util import items
-from pytyp.spec.abcs import Any
+from pytyp.spec.abcs import ANY
 
 
 class TypedValue:
@@ -194,7 +194,7 @@ class TypedDict(dict):
         if isinstance(value, TypedValue):
             super(TypedDict, self).__setitem__(name, value)
         else:
-            spec = self.typed_get(name).spec if name in self else Any
+            spec = self.typed_get(name).spec if name in self else ANY
             super(TypedDict, self).__setitem__(name, TypedValue(value, spec))
 
     def values(self):

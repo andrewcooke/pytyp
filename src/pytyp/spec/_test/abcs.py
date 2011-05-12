@@ -5,7 +5,7 @@ from itertools import count
 from operator import __and__
 from unittest import TestCase
 
-from pytyp.spec.abcs import Seq, Rec, Alt, Opt, Ins, ANY, Delayed, And, Atr, Or,\
+from pytyp.spec.abcs import Seq, Rec, Alt, Opt, Cls, ANY, Delayed, And, Atr, Or,\
     Product, Sum, Sub, NoNormalize, TSMeta
 from pytyp.spec.dispatch import overload
 
@@ -25,7 +25,7 @@ class SeqTest(TestCase):
         sint = Seq(int)
         sfloat = Seq(float)
         assert sint is not sfloat
-        assert sint._abc_type_arguments == ((0, Ins(int)),), sint._abc_type_arguments
+        assert sint._abc_type_arguments == ((0, Cls(int)),), sint._abc_type_arguments
         
     def test_mixin(self):
         SFloat = Seq(float)
@@ -242,36 +242,36 @@ class OptTest(TestCase):
         assert not isinstance('one', Opt(int))
         
         
-class InsTest(TestCase):
+class ClsTest(TestCase):
     
     def test_class_register(self):
         class Bar: pass
         class Baz: pass
         bar = Bar()
-        assert not isinstance(bar, Ins(Baz))
-        Ins(Baz).register_instance(bar)
-        assert isinstance(bar, Ins(Baz))
+        assert not isinstance(bar, Cls(Baz))
+        Cls(Baz).register_instance(bar)
+        assert isinstance(bar, Cls(Baz))
         
-        assert issubclass(Bar, Ins(Bar))
-        assert not issubclass(Baz, Ins(Bar))
-        Ins(Bar).register(Baz)
-        assert issubclass(Baz, Ins(Bar))
+        assert issubclass(Bar, Cls(Bar))
+        assert not issubclass(Baz, Cls(Bar))
+        Cls(Bar).register(Baz)
+        assert issubclass(Baz, Cls(Bar))
 
     def test_structural(self):
         class Bar: pass
         bar = Bar()
-        assert isinstance(bar, Ins(Bar))
+        assert isinstance(bar, Cls(Bar))
         
     def test_inheritance(self):
-        assert issubclass(Ins(int), Ins)
-        assert issubclass(int, Ins(int))
-        assert not issubclass(int, Ins)
+        assert issubclass(Cls(int), Cls)
+        assert issubclass(int, Cls(int))
+        assert not issubclass(int, Cls)
         
     def test_attributes(self):
         class Foo: pass
-        assert Ins(Foo, x=int) == And(Ins(Foo), Atr(x=int)), Ins(Foo, x=int)
-        r = repr(Ins(Foo, x=int))
-        assert r == "And(Atr(x=int),Ins(Foo))", r
+        assert Cls(Foo, x=int) == And(Cls(Foo), Atr(x=int)), Cls(Foo, x=int)
+        r = repr(Cls(Foo, x=int))
+        assert r == "And(Atr(x=int),Cls(Foo))", r
         
         
 class AndTest(TestCase):
@@ -299,13 +299,13 @@ class AndTest(TestCase):
         ifoo = Foo(1)
         sfoo = Foo('one')
         assert isinstance(ifoo, Foo)
-        assert isinstance(sfoo, Ins(Foo))
+        assert isinstance(sfoo, Cls(Foo))
         assert isinstance(ifoo, And(Foo, Atr(x=int)))
         assert not isinstance(sfoo, And(Foo, Atr(x=int)))
         
         assert not issubclass(int, And(int, str))
         
-        assert isinstance(ifoo, Ins(Foo, x=int))
+        assert isinstance(ifoo, Cls(Foo, x=int))
         
         
 class OrTest(TestCase):
@@ -338,7 +338,7 @@ class OrderTest(TestCase):
 class SubTest(TestCase):
     
     def test_subinstance(self):
-        assert isinstance(int, Sub(Ins(int)))
+        assert isinstance(int, Sub(Cls(int)))
         assert isinstance(Alt(int, str), Sub(Sum))
         assert not isinstance(Alt(int, str), Sub(Product))
 

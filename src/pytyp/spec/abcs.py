@@ -68,18 +68,18 @@ class TSMeta(ABCMeta):
         >>> TSMeta._normalize([int])
         Seq(int)
         >>> TSMeta._normalize([])
-        Seq(Ins(object))
+        Seq(Cls(object))
         >>> Seq([int])
         Seq(Seq(int))
         >>> TSMeta._normalize(int)
         int
         >>> class Foo: pass
         >>> TSMeta._normalize(Foo)
-        Ins(Foo)
+        Cls(Foo)
         >>> TSMeta._normalize(Alt(int, str))
         Alt(int,str)
         >>> TSMeta._normalize(Alt(int, Foo))
-        Alt(int,Ins(Foo))
+        Alt(int,Cls(Foo))
         >>> TSMeta._normalize(Opt([int]))
         Opt(Seq(int))
         >>> TSMeta._normalize([int, str])
@@ -104,7 +104,7 @@ class TSMeta(ABCMeta):
             elif NoNormalize in spec.__bases__:
                 return spec
             else:
-                return Ins(spec)
+                return Cls(spec)
         else:
             return TSMeta._normalize(type(spec))
 
@@ -187,7 +187,7 @@ class TypeSpec(ReprBase):
 
 class Atomic(metaclass=ABCMeta):
     '''
-    These are formatted without "Ins(...)".
+    These are formatted without "Cls(...)".
     '''
     
 Atomic.register(Number)
@@ -524,7 +524,7 @@ class Opt(Alt, NoNormalize):
         return cls._abc_type_arguments[1][1]
     
 
-class Ins(Product):
+class Cls(Product):
     
     _abc_class_cache = WeakKeyDictionary()
     
@@ -533,7 +533,7 @@ class Ins(Product):
 
             # TODO - convert to call to type with name
 
-            class __Ins(Ins, TypeSpec, NoNormalize):
+            class __Cls(Cls, TypeSpec, NoNormalize):
                 
                 _abc_instance_registry = WeakSet()
                 _abc_class = class_
@@ -560,17 +560,17 @@ class Ins(Product):
                 def _fmt_args(cls):
                     return cls._abc_class.__name__
         
-            cls._abc_class_cache[class_] = __Ins
+            cls._abc_class_cache[class_] = __Cls
         spec = cls._abc_class_cache[class_]
-        spec._abc_name = Ins.__name__
+        spec._abc_name = Cls.__name__
         if class_ is not object:
-            Ins().register(spec)
+            Cls().register(spec)
         if kargs:
             return And(spec, Atr(**kargs))
         else:
             return spec
     
-ANY = Ins()
+ANY = Cls()
 
 
 class Sub(ReprBase):

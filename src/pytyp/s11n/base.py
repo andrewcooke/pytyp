@@ -28,7 +28,7 @@
 
 from inspect import getfullargspec, getcallargs
 from collections import Callable, Iterable, Mapping
-from pytyp.spec.abcs import Atomic, ANY, Rec, Seq, Ins, type_error, Alt, \
+from pytyp.spec.abcs import Atomic, ANY, Rec, Seq, Cls, type_error, Alt, \
     TSMeta, Sub
 from pytyp.spec.dispatch import overload
 
@@ -222,7 +222,7 @@ class Transcode:
             type_error(value, spec)
 
     @__call__.intercept
-    def map_instance(self, value:Mapping, spec:Sub(Ins)):
+    def map_instance(self, value:Mapping, spec:Sub(Cls)):
         (varargs, varkw, dict_spec) = class_to_dict_spec(spec)
         new_value = transcode(value, dict_spec)
         args = new_value.pop(Rec.OptKey(varargs), []) if varargs else []
@@ -236,7 +236,7 @@ class Transcode:
         return spec._abc_class(*args, **kargs)
     
     @__call__.intercept
-    def other_instance(self, value, spec:Sub(Ins)):
+    def other_instance(self, value, spec:Sub(Cls)):
         if isinstance(value, spec):
             return value
         else:
@@ -282,7 +282,7 @@ class Transcode3:
             type_error(value, spec)
 
     @__call__.intercept
-    def map_instance(self, value:Mapping, spec:Sub(Ins)):
+    def map_instance(self, value:Mapping, spec:Sub(Cls)):
         (varargs, varkw, dict_spec) = class_to_dict_spec(spec)
         new_value = transcode3(value, dict_spec)
         args = new_value.pop(Rec.OptKey(varargs), []) if varargs else []
@@ -296,7 +296,7 @@ class Transcode3:
         return spec._abc_class(*args, **kargs)
     
     @__call__.intercept
-    def other_instance(self, value, spec:Sub(Ins)):
+    def other_instance(self, value, spec:Sub(Cls)):
         if isinstance(value, spec):
             return value
         else:
@@ -333,7 +333,7 @@ transcode3 = Transcode3()
 
 
 def transcode2(value, spec):
-    if issubclass(spec, Ins) and spec._abc_class != object:
+    if issubclass(spec, Cls) and spec._abc_class != object:
         if isinstance(value, Mapping):
             (varargs, varkw, dict_spec) = class_to_dict_spec(spec)
             new_value = transcode(value, dict_spec)

@@ -18,13 +18,13 @@ class ParseArgsTest(TestCase):
     
     def test_parse(self):
         self.assert_parse('a:int=1', "OrderedDict([('a', (int, '1'))])")
-        self.assert_parse('a:int=1,b', "OrderedDict([('a', (int, '1')), ('b', (Ins(object), None))])")
+        self.assert_parse('a:int=1,b', "OrderedDict([('a', (int, '1')), ('b', (Cls(object), None))])")
         self.assert_parse('a:int=1,:int', "OrderedDict([('a', (int, '1')), (0, (int, None))])")
         self.assert_parse('a:int=1,b:int', "OrderedDict([('a', (int, '1')), ('b', (int, None))])")
-        self.assert_parse('a:int=1,=2', "OrderedDict([('a', (int, '1')), (0, (Ins(object), '2'))])")
-        self.assert_parse('a:int=1,b=2', "OrderedDict([('a', (int, '1')), ('b', (Ins(object), '2'))])")
+        self.assert_parse('a:int=1,=2', "OrderedDict([('a', (int, '1')), (0, (Cls(object), '2'))])")
+        self.assert_parse('a:int=1,b=2', "OrderedDict([('a', (int, '1')), ('b', (Cls(object), '2'))])")
         self.assert_parse('a:int=1,:int=2', "OrderedDict([('a', (int, '1')), (0, (int, '2'))])")
-        self.assert_parse('a:int=1,,', "OrderedDict([('a', (int, '1')), (0, (Ins(object), None)), (1, (Ins(object), None))])")
+        self.assert_parse('a:int=1,,', "OrderedDict([('a', (int, '1')), (0, (Cls(object), None)), (1, (Cls(object), None))])")
         self.assert_parse('a:int,b:Rec(Seq(Opt(int)))', "OrderedDict([('a', (int, None)), ('b', (Rec(Seq(Opt(int))), None))])")
         self.assert_parse('a:str,__:int', "OrderedDict([('a', (str, None)), ('__', (int, None))])")
                           

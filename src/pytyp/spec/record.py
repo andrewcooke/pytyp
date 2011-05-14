@@ -2,9 +2,9 @@
 from collections import OrderedDict
 from string import whitespace
 
-import pytyp.spec.abcs as abcs
 from pytyp.spec.check import checked as _checked, verify as _verify
 from pytyp.spec.abcs import normalize, ANY
+import pytyp.spec.abcs as abcs
 
 
 RESIZE = '__'
@@ -12,6 +12,15 @@ RESIZE = '__'
 
 def record(typename, field_names, verbose=False, mutable=False, checked=True,
            context=None):
+    '''
+    This creates a wrapper around `dict` that allows attribute access.  In other
+    words: it unifies `Rec()` and `Atr()`; it provides both __..item__ and __..attr__
+    access.
+    
+    `field_names` should be an argument list in normal Python syntax.  This can
+    include  default values and type annotations.  For example: 'a,b=5' or
+    'a:int,b:Seq(str)'.
+    '''
     _context = dict(abcs.__dict__)
     if context: _context.update(context)
     nsd = parse_args(field_names, _context)
@@ -35,7 +44,6 @@ def class_template(typename, nsd, mutable, checked):
     verify = '\n'.join(map(pad8, fmt_verify(nsd, checked)))
     init_args = ', '.join(fmt_init_args(nsd))
     init_set = '\n'.join(map(pad8, fmt_init_set(nsd)))
-    properties = '\n'.join(map(pad4, fmt_properties(nsd, mutable)))
     return '''class {typename}(dict, {typespec}):
     """
     record {typename}:
@@ -45,19 +53,29 @@ def class_template(typename, nsd, mutable, checked):
     {checked}
     def __init__(self, {init_args}):
 {init_set}
-        self.__lock = None
+        self._lock = None
     def __setitem__(self, name, value):
+        if not {mutable}: raise TypeError('Immutable')
         if name not in self.__specs and '__' not in self.__specs:
             raise TypeError('Record {{}} does not exist'.format(name))
 {verify}            
         super().__setitem__(name, value)
-{properties}
     def _replace(self, **kargs):
         state = dict(self)
         state.update(kargs)
         return {typename}(**state)
+    def __unpack(self, name):
+        if name.startswith('_'):
+            try: return int(name[1:])
+            except: pass
+        return name
+    def __getattr__(self, name):
+        if name != '_lock' and hasattr(self, '_lock'):
+            return self.__getitem__(self.__unpack(name))
+        return super().__getattr__(name)
     def __setattr__(self, name, value):
-        if hasattr(self, '_{typename}__lock'):
+        if hasattr(self, '_lock'):
+            if not {mutable}: raise AttributeError('Immutable')
             self.__setitem__(name, value)
         super().__setattr__(name, value)'''.format(**locals())
 

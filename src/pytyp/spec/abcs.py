@@ -1,41 +1,17 @@
 
+#LICENCE
+
 from abc import ABCMeta, abstractmethod
-from collections import Sequence, Mapping, ByteString, MutableSequence, MutableMapping, \
-    Container
-from functools import wraps
+from collections import Sequence, Mapping, ByteString, Container
 from itertools import count
 from numbers import Number
-from reprlib import recursive_repr, get_ident
+from reprlib import recursive_repr
 from weakref import WeakSet, WeakKeyDictionary
 
-from pytyp.util import items
+from pytyp.util import items, make_recursive_block
 
 # TODO abc_name in wrong place?  see cls
 # TODO weak dict for types?
-
-
-def make_recursive_block(make_key=lambda args: id(args[0]), 
-                            on_recursion=lambda x: x):
-
-    def recursive_block(function):
-    
-        running = set()
-    
-        @wraps(function)
-        def wrapper(*args):
-            subkey = make_key(args)
-            key = (subkey, get_ident())
-            if key in running:
-                return on_recursion(subkey)
-            running.add(key)
-            try:
-                result = function(*args)
-            finally:
-                running.discard(key)
-            return result
-        return wrapper
-    
-    return recursive_block
 
 
 block_recursive_type = make_recursive_block(lambda args: (id(args[0]), id(args[1])), 
@@ -43,6 +19,38 @@ block_recursive_type = make_recursive_block(lambda args: (id(args[0]), id(args[1
 
 
 class TSMeta(ABCMeta):
+    '''
+    The metaclass for type specifications.  This extends ``ABCMeta`` to include 
+    the instance hook and adds a few utilities.
+    
+        >>> normalize(Rec(a=int))
+        Rec(a=int)
+        >>> normalize({'a': int})
+        Rec(a=int)
+        >>> normalize((int, str))
+        Rec(int,str)
+        >>> normalize(Rec((int,), {'a':str}))
+        Rec(Rec(int),Rec(a=str))
+        >>> normalize([int])
+        Seq(int)
+        >>> normalize([])
+        Seq(Cls(object))
+        >>> Seq([int])
+        Seq(Seq(int))
+        >>> normalize(int)
+        int
+        >>> class Foo: pass
+        >>> normalize(Foo)
+        Cls(Foo)
+        >>> normalize(Alt(int, str))
+        Alt(int,str)
+        >>> normalize(Alt(int, Foo))
+        Alt(int,Cls(Foo))
+        >>> normalize(Opt([int]))
+        Opt(Seq(int))
+        >>> normalize([int, str])
+        Rec(int,str)
+    '''
     
     def __instancecheck__(cls, instance):
         try:
@@ -57,56 +65,31 @@ class TSMeta(ABCMeta):
     @make_recursive_block()
     def _normalize(spec):
         '''
-        >>> TSMeta._normalize(Rec(a=int))
-        Rec(a=int)
-        >>> TSMeta._normalize({'a': int})
-        Rec(a=int)
-        >>> TSMeta._normalize((int, str))
-        Rec(int,str)
-        >>> TSMeta._normalize(Rec((int,), {'a':str}))
-        Rec(Rec(int),Rec(a=str))
-        >>> TSMeta._normalize([int])
-        Seq(int)
-        >>> TSMeta._normalize([])
-        Seq(Cls(object))
-        >>> Seq([int])
-        Seq(Seq(int))
-        >>> TSMeta._normalize(int)
-        int
-        >>> class Foo: pass
-        >>> TSMeta._normalize(Foo)
-        Cls(Foo)
-        >>> TSMeta._normalize(Alt(int, str))
-        Alt(int,str)
-        >>> TSMeta._normalize(Alt(int, Foo))
-        Alt(int,Cls(Foo))
-        >>> TSMeta._normalize(Opt([int]))
-        Opt(Seq(int))
-        >>> TSMeta._normalize([int, str])
-        Rec(int,str)
+        This rewrites the "shorthand" form (without ``Cls()``, using ``[]`` 
+        instead of ``Seq()``, etc).
         '''
         if isinstance(spec, list):
             if not spec:
                 return Seq()
             if len(spec) == 1:
-                return Seq(TSMeta._normalize(spec[0]))
+                return Seq(normalize(spec[0]))
             else:
-                return Rec(*map(TSMeta._normalize, spec))
+                return Rec(*map(normalize, spec))
         elif isinstance(spec, dict):
-            return Rec(_dict=dict((name, TSMeta._normalize(spec[name])) 
+            return Rec(_dict=dict((name, normalize(spec[name])) 
                                   for name in spec))
         elif isinstance(spec, tuple):
-            return Rec(*tuple(TSMeta._normalize(s) for s in spec))
+            return Rec(*tuple(normalize(s) for s in spec))
         elif isinstance(spec, type):
             if issubclass(spec, Delayed):
-                spec._spec = TSMeta._normalize(spec._spec)
+                spec._spec = normalize(spec._spec)
                 return spec
             elif NoNormalize in spec.__bases__:
                 return spec
             else:
                 return Cls(spec)
         else:
-            return TSMeta._normalize(type(spec))
+            return normalize(type(spec))
 
     @recursive_repr()
     def __repr__(cls):
@@ -116,6 +99,26 @@ class TSMeta(ABCMeta):
             return super().__repr__()
         
 normalize = TSMeta._normalize
+'''
+Type specifications are built using constructors like ``Seq()`` and ``Rec()``,
+but it is also possible to use a "shorthand" form, in which ``()`` and ``{}`` 
+are used for for records, and ``[]`` for sequences.
+
+This routine rewrites the shorthand into the standard format. 
+        
+    >>> normalize({'a': int})
+    Rec(a=int)
+    >>> normalize((int, str))
+    Rec(int,str)
+    >>> normalize([int])
+    Seq(int)
+    >>> normalize([])
+    Seq(Cls(object))
+    >>> normalize(Opt([int]))
+    Opt(Seq(int))
+    >>> normalize([int, str])
+    Rec(int,str)
+'''
             
     
 class NoStructural():
@@ -204,11 +207,18 @@ class RecursiveType(TypeError):
 
 class DelayedTypeError(TypeError): pass
 
-class NoBacktrack(Exception, metaclass=ABCMeta): pass
+class NoBacktrack(Exception, metaclass=ABCMeta):
+    '''
+    If this exception (or a subclass, or a registered class) occurs within
+    ``_backtrack()`` then it will be allowed to "escape" to the surrounding
+    code (other exceptions will be caught and used to trigger backtracking
+    over sum types).
+    '''
+    pass
 
 
 def expand(value, spec, callback):
-    return TSMeta._normalize(spec)._for_each(value, callback)
+    return normalize(spec)._for_each(value, callback)
     
     
 def type_error(value, spec):
@@ -232,9 +242,9 @@ def _hashable_types(args, kargs):
     Also, order the args (indexed specs) before the kargs so that generating 
     the repr can handle them correctly.
     '''
-    types = dict((name, TSMeta._normalize(karg)) for (name, karg) in kargs.items())
+    types = dict((name, normalize(karg)) for (name, karg) in kargs.items())
     for (index, arg) in zip(count(), args):
-        types[index] = TSMeta._normalize(arg)
+        types[index] = normalize(arg)
     return tuple((key, types[key]) for key in sorted(types.keys(), key=_sort_key))
 
 
@@ -245,8 +255,8 @@ def _unhashable_types(types):
 
 def _polymorphic_subclass(bases, args, kargs):
     abc = bases[0]
-    args = tuple(TSMeta._normalize(arg) for arg in args)
-    kargs = dict((name, TSMeta._normalize(karg)) 
+    args = tuple(normalize(arg) for arg in args)
+    kargs = dict((name, normalize(karg)) 
                  for (name, karg) in kargs.items())
     types = _hashable_types(args, kargs)
     if types not in abc._abc_polymorphic_cache:
@@ -283,6 +293,21 @@ class Sum:
     
 
 class Seq(Product):
+    '''
+    This describes a sequence of values, all of the same type.  For example:
+    
+        >>> isinstance([1,2,3], Seq(int))
+        True
+        >>> isinstance(('four', 'five'), Seq(str))
+        True
+        >>> isinstance([1,'two',None], Seq(int))
+        False
+    
+    If no type is given, then ``object`` is assumed (which is the same as "anything"):
+    
+        >>> isinstance([1,'two',None], Seq())
+        True
+    '''
     
     _abc_polymorphic_cache = {}
     
@@ -334,6 +359,24 @@ class FmtArgsMixin:
 
     
 class Rec(Product, FmtArgsMixin):
+    '''
+    This describes `records` - containers with contents that are accessed via a name.
+    Usually the name is a string:
+    
+        >>> isinstance({'a':1, 'b':'two'}, Rec(a=int, b=str))
+        True
+    
+    But it can also be an integer (unnamed arguments to ``Rec()`` are numbered from 0):
+    
+        >>> isinstance((1, 'two'), Rec(int, str))
+        True
+    
+    Or even arbitrary objects:
+    
+        >>> foo = object()
+        >>> isinstance({foo: 1}, Rec(_dict={foo: int}))
+        True
+    '''
     
     _abc_polymorphic_cache = {}
     
@@ -426,6 +469,26 @@ class Rec(Product, FmtArgsMixin):
 
 
 class Atr(Product, FmtArgsMixin):
+    '''
+    This describes the attributes on an object.  Methods are not supported (instead,
+    use `function annotations 
+    <http://docs.python.org/py3k/reference/compound_stmts.html#index-22>`_ on the 
+    method itself::
+    
+        >>> class Foo:
+        ...     def __init__(self, a, b):
+        ...         self.a = a
+        ...         self.b = b
+        >>> foo = Foo(1, 'two')
+        >>> Atr(a=int, b=str).register_instance(foo)
+        
+    The ``Cls()`` constructor (described below) also has a "shorthand" for defining
+    classes with attributes:
+
+        >>> class Bar: pass    
+        >>> Cls(Bar, a=int, b=str)
+        And(Cls(Bar),Atr(a=int,b=str))
+    '''
     
     _abc_polymorphic_cache = {}
     
@@ -458,6 +521,21 @@ class Atr(Product, FmtArgsMixin):
 
 
 class Alt(Sum, FmtArgsMixin):
+    '''
+    This describes a value that can have more that one type.  For example, 
+    ``Alt(int,str)`` can be an ``int`` or a ``str``::
+    
+        >>> isinstance(1, Alt(number=int, text=str))
+        True
+        >>> isinstance('two', Alt(number=int, text=str))
+        True
+        >>> isinstance(3.0, Alt(number=int, text=str))
+        False
+        
+    This is like ``Or()`` below, but lets you add a name to the different
+    alternatives (this name is available during iteration - see below - and
+    what it means will depend on how the type specification is being used).
+    '''
     
     # this makes no sense as a mixin - it exists only to specialise the 
     # functionality provided by the Polymorphic factory above (ie to hold 
@@ -503,6 +581,17 @@ class Alt(Sum, FmtArgsMixin):
 
 
 class Opt(Alt, NoNormalize):
+    '''
+    This describes a common case of ``Alt()`` where the value is either the given
+    type, or ``None``.
+    
+        >>> isinstance(1, Opt(int))
+        True
+        >>> isinstance(None, Opt(int))
+        True
+        >>> issubclass(Opt(int), Alt(value=int,none=type(None)))
+        True
+    '''
     
     # defining this as a subclass of Alt, rather than simple function that calls
     # Alt just gives a nicer formatting
@@ -525,6 +614,13 @@ class Opt(Alt, NoNormalize):
     
 
 class Cls(Product):
+    '''
+    This describes a particular class.  You don't need to use it normally (just use
+    the class itself), but it is used internally::
+    
+        >>> Seq(int) is Seq(Cls(int))
+        True
+    '''
     
     _abc_class_cache = WeakKeyDictionary()
     
@@ -571,9 +667,19 @@ class Cls(Product):
             return spec
     
 ANY = Cls()
+'''
+A useful pre-defined type specification that matches any object.  It is the same
+as ``Cls(object)`` (which can also be written as ``Cls()``).
+'''
 
 
 class Sub(ReprBase):
+    '''
+    This is like ``Cls()``, but uses ``issubclass()`` rather than ``isinstance()``.
+    
+    It doesn't make much sense as a type specification, and is arguably an ugly hack,
+    but it is very useful when using :mod:`dispatch by type pytyp.spec.dispatch`.
+    '''
           
     _abc_class_cache = WeakKeyDictionary()
     
@@ -654,11 +760,33 @@ class _Set(TypeSpec):
 
 
 class And(Product, _Set):
+    '''
+    This describes something with several different types `at the same time`::
+    
+        >>> isinstance([1,2,3], And(list, Seq(int)))
+        True
+        >>> isinstance((1,2,3), And(list, Seq(int)))
+        False
+        >>> isinstance((1,2,3), Seq(int))
+        True
+    '''
     
     _abc_polymorphic_cache = {}
     
     
 class Or(Sum, _Set):
+    '''
+    This describes something that can is one of several different types (and we
+    don't know which).  It is very like ``Alt()`` above, except that the
+    alternatives cannot be named.
+    
+        >>> isinstance(1, Or(int, str))
+        True
+        >>> isinstance('two', Or(int, str))
+        True
+        >>> isinstance(3.0, Or(int, str))
+        False
+    '''
 
     _abc_polymorphic_cache = {}
     
@@ -679,7 +807,7 @@ class Delayed(TypeSpec, NoNormalize):
     def set(cls, spec):
         if cls._defined:
             raise DelayedTypeError('Delayed defined')
-        cls._spec = TSMeta._normalize(spec)
+        cls._spec = normalize(spec)
         cls._defined = True
     
     @classmethod

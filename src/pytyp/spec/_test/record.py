@@ -108,7 +108,3 @@ class RecordTest(TestCase):
         StrTuple = record('StrTuple', ':str,:str')
         stuple = StrTuple('foo', 'bar')
         
-    def test_int_list(self):
-        IntList = record('IntList', '__:int', mutable=True, verbose=True)
-        ilist = IntList(0,1,2)
-        

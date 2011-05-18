@@ -36,3 +36,27 @@ class ExpandTest(TestCase):
         assert n == 7, n
         
         
+class PreviousTest(TestCase):
+    
+    def test_previous(self):
+        
+        class Previous:
+            
+            @overload
+            def __call__(self, data):
+                data.append(0)
+                return data
+            
+            @__call__.intercept
+            def one(self, data, previous):
+                data.append(1)
+                if previous:
+                    return self.one.previous(data)
+                else:
+                    return data
+        
+        p = Previous()
+        assert p([2]) == [2,0], p([2])
+        assert p([2], False) == [2,1], p([2], False)
+        assert p([2], True) == [2,1,0], p([2], True)
+        

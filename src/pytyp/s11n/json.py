@@ -35,10 +35,10 @@ from pytyp.spec.abcs import Atomic
 
 def dump(obj, fp, **kargs):
     '''
-    Serialize `obj` as a JSON formatted stream to `fp` (a
-    `.write()`-supporting file-like object).
+    Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
+    ``.write()``-supporting file-like object).
 
-    This is intended as a direct substitute for the `dump()` function in
+    This is intended as a direct substitute for the ``dump()`` function in
     Python's json package.  It supports the same options, except for `cls`
     (which is used internally to provide Pytyp's own encoding).
 
@@ -58,9 +58,9 @@ def dump(obj, fp, **kargs):
 
 def dumps(obj, **kargs):
     '''
-    Serialize obj to a JSON formatted string.
+    Serialize ``obj`` to a JSON formatted string.
 
-    This is intended as a direct substitute for the `dumps()` function in
+    This is intended as a direct substitute for the ``dumps()`` function in
     Python's json package.  It supports the same options, except for `cls`
     (which is used internally to provide Pytyp's own encoding).
 
@@ -72,7 +72,7 @@ def dumps(obj, **kargs):
     :param obj: The Python object (or collection) to encode.
     :param kargs: Additional parameters are passed directly to the 
                   corresponding routine in Python's json package.
-    :return: A string containing the JSON encoded `obj`.
+    :return: A string containing the JSON encoded ``obj``.
 
     Here is an example of encoding a Python class, and then reading that back
     from JSON:
@@ -102,9 +102,6 @@ def dumps(obj, **kargs):
       
     Even nested classes can be written and read back correctly - see the example for 
     `make_loads()` below.
-    
-    Type specifications are "pictures" of the expected type.  See 
-    :ref:`decoding` and :ref:`type_specs` for more details.
     '''
     return dumps_(obj, cls=JSONEncoder, **kargs)
 
@@ -127,15 +124,15 @@ A custom encoder for the Python json module.
 
 def make_load(spec):
     '''
-    Create a replacement for the `load()` function in Python's json package
-    that will deserialize a `.read()`-supporting file-like object containing a
+    Create a replacement for the ``load()`` function in Python's json package
+    that will deserialize a ``.read()``-supporting file-like object containing a
     JSON document to a Python object.
 
     :param spec: The type specification for the root object.  Nested objects
                  are defined by type annotations.  See :ref:`decoding` for
                  full details.
-    :return: A replacement for `load()` in the Python json package, which will
-             read from a file are return the data structured as `spec`.
+    :return: A replacement for ``load()`` in the Python json package, which will
+             read from a file are return the data structured as ``spec``.
     '''
     cls = make_JSONDecoder(spec)
     def load(fp, **kargs):
@@ -145,15 +142,15 @@ def make_load(spec):
 
 def make_loads(spec):
     '''
-    Create a replacement for the `loads()` function in Python's json package
+    Create a replacement for the ``loads()`` function in Python's json package
     that will deserialize a string containing a JSON document to a Python
     object.
 
     :param spec: The type specification for the root object.  Nested objects
                  are defined by type annotations.  See :ref:`decoding` for
                  full details.
-    :return: A replacement for `loads()` in the Python json package, which will
-             read from a string are return the data structured as `spec`.
+    :return: A replacement for ``loads()`` in the Python json package, which will
+             read from a string are return the data structured as ``spec``.
 
     For example:
 
@@ -185,8 +182,8 @@ def make_JSONDecoder(spec):
     :param spec: The type specification for the root object.  Nested objects
                  are defined by type annotations.  See :ref:`decoding` for
                  full details.
-    :return: A replacement for the `JSONDecoder` class in the Python json 
-             package, which returns data structured as `spec`.
+    :return: A replacement for the ``JSONDecoder`` class in the Python json 
+             package, which returns data structured as ``spec``.
     '''
 
     class JSONDecoder(JSONDecoder_):

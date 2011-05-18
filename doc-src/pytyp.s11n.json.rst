@@ -1,4 +1,10 @@
 
+.. automodule:: pytyp.s11n.json
+
+.. testsetup::
+
+  from pytyp.s11n.json import *
+
 JSON Serialisation (pytyp.s11n.json)
 ====================================
 
@@ -8,10 +14,12 @@ interacts with JSON (you don't need to use dicts where you would normally use
 a class, which means you can access values using attributes rather named
 indices).
 
-.. automodule:: pytyp.s11n.json
-
 Encoding
 --------
+
+.. tip::
+
+   For background details see :ref:`encoding` and :ref:`type_specs`.
 
 .. autofunction:: dumps
 .. autofunction:: dump
@@ -19,6 +27,10 @@ Encoding
 
 Decoding
 --------
+
+.. tip::
+
+   For background details see :ref:`decoding` and :ref:`type_specs`.
 
 .. autofunction:: make_loads
 .. autofunction:: make_load

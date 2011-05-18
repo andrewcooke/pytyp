@@ -91,11 +91,11 @@ class RecordTest(TestCase):
         assert spec == Seq(int), spec
     
     def test_sizeable(self):
-        Record = record('Record', 'a:str,__:int', mutable=True)
+        Record = record('Record', 'a:str,__:int', mutable=True, verbose=True)
         r = Record(a='poop',foo=1)
         assert r.a == 'poop', r.a
         assert r['a'] == 'poop', r['a']
-        #assert r.foo == 1, r.foo
+        assert r.foo == 1, r.foo
         assert r['foo'] == 1, r['foo']
         
         try:

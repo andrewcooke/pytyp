@@ -85,14 +85,14 @@ with dynamic dispatch and type–checking of functions via decorators.
 Introduction
 ------------
 
-Some languages have static type systems.  These let the compiler check for
-errors before the program is run, but often, in languages like Java, this
-seems more of a hinderance than a help.  So many people (like me!) prefer
-Python because of the freedom associated with a lack of type declarations.
+Some languages have static type systems, letting the compiler check for errors
+before the program is run.  Often, in languages like Java, this seems more of
+a hinderance than a help; many people prefer Python for the freedom associated
+with a lack of type declarations.
 
 But other languages — like Haskell and Scala — are using types in interesting
-ways.  And even in Python we sometimes use commands like ``isinstance()``,
-which have some connection with "types".
+ways.  And even in Python we sometimes use commands like ``isinstance()`` and
+``issubclass()``.
 
 So there are interesting questions to explore:
 
@@ -117,9 +117,9 @@ In the first section, `Current Status`_, I sketch Python's runtime type
 support.  This shows how ABCs provide a clear, general model for duck typing.
 
 The next section, `Discussion`_, explores how new ideas can be added to
-Python.  For example, the ``Sequence`` ABC might be extended to
-``Sequence(int)`` to describe sequences of integers.  These "parametric ABCs"
-could support registration of instances as well as classes; for mutable
+Python.  For example, we might extend the ``Sequence`` ABC, using
+``Sequence(int)`` to describe sequences of integers.  "Parametric ABCs" like
+this could support registration of instances as well as classes; for mutable
 containers that do not support hashing (and so cannot be registered)
 introspective, structural verification could be an option [#]_::
 
@@ -186,12 +186,11 @@ powerful, is rarely exploited to the full.
 Duck Typing
 ~~~~~~~~~~~
 
-Despite the above some operations still appear specific to certain class
-instances.  For example, the function ``float()`` only works for numerical
-types (or strings that can be interpreted as numerical values).  But such
-examples can generally be explained in terms of attribute access via "special"
-methods (in the case of ``float()``, the method ``__float__()`` on the
-function's argument).
+Some operations appear specific to certain class instances.  For example, the
+function ``float()`` only works for numerical types (or strings that can be
+interpreted as numerical values).  But such examples can generally be
+explained in terms of attribute access via "special" methods (in the case of
+``float()``, the method ``__float__()`` on the function's argument).
 
 I do not know if *every* operation can be explained in terms of attributes,
 but my strong impression is that this is the intention: **Python's runtime
@@ -213,7 +212,7 @@ typing.**
 In more detail: a programmer can identify a set of attributes, create an ABC
 that contains these, and then either subclass, or call the ``register()``
 method, to associate a class with the ABC.  The metaclass for ABCs,
-``ABCMeta``, then modifies the behaviour of ``is­inst­ance()`` and
+``ABCMeta``, modifies the behaviour of ``is­inst­ance()`` and
 ``is­sub­class()`` to expose this relationship at runtime.
 
 It is important to understand that Python does not support the runtime
@@ -231,8 +230,8 @@ It is important to understand that Python does not support the runtime
    ``Hashable``, ``Iterable``, ``Iterator``, ``Sized``, ``Container`` and
    ``Callable``.
 
-Instead, ``MyExample`` must either subclass ``MyAbc`` or register itself
-(populating a lookup table used by ``issubclass()``).  The ABC acts only as a
+Instead, ``MyExample`` must either subclass ``MyAbc`` or register itself,
+populating a lookup table used by ``issubclass()``.  The ABC acts only as a
 marker that signals the veracity of the registered (or subclass) type; it does
 not perform a runtime check of the attributes [#]_.
 
@@ -269,9 +268,10 @@ associated with types) to be specified on functions.  However, ABCs act only
 as an unverified marker; runtime checks are restricted to a few special cases.
 Nor are type annotations verified.
 
-So **ABCs are type metadata;** ``isinstance()``, **via** ``ABCMeta``,
-**associates type metadata with values; type annotations associate type
-metadata with variables.** The rest of this paper builds on this.
+So **ABCs are type metadata;** ``ABCMeta`` **associates type metadata with
+values and provides access to the relationship via** ``isinstance()``; **type
+annotations associate type metadata with variables.** The rest of this paper
+builds on this.
 
 Discussion
 ----------
@@ -305,8 +305,8 @@ more formally, ``Seq(int)``.  I will call this a *type specification*.
 
 This can be extended to inhomogenous collections: dictionaries would look like
 ``{'a':int, 'b':str}``; tuples like ``(int, str)``.  A unified syntax is
-``Rec(a=int, b=str)`` or ``Rec(int, str)`` (where unnamed arguments have
-implicit integer indices: 0,1,2...).
+``Rec(a=int, b=str)`` or ``Rec(int, str)`` (named arguments are assumed to be
+string keys; unnamed arguments have implicit integer indices: 0,1,2...).
 
 But we have a problem: the step from sequences to maps was more significant
 than a simple change of syntax.  **When we try to translate** ``Rec()`` **back
@@ -340,8 +340,8 @@ verfication, is a harder problem.  There is not always a single, well–defined
 answer.  In some simpler cases we may have a set of candidate types, in which
 case we can verify them in turn, in other cases the instance's class may
 inherit from one or more ABCs.  But I don't see a good, "pythonic" solution to
-the general problem.  So this paper does not extend ``type()`` to include
-typed collections.
+the general problem.  So this work does not extend ``type()`` to include typed
+collections.
 
 **Iteration** over a collection by type covers a variety of uses where we want
 to process data in a manner informed by the associated types.  One example is
@@ -378,24 +378,26 @@ be expressed in terms of the latter (alone).
 Product Types
 .............
 
-The handling of maps above (``Rec(a=int, b=str)``) is close to the concept of
-product types: a record with a fixed number of values (referenced by label or
-index), each with a distinct type.
+The handling of maps above — ``Rec(a=int, b=str)`` — is close to the concept
+of product types: a record with a fixed number of values (referenced by label
+or index), each with a distinct type.
 
 But there are some problems relating this to Python:
 
 * The ``Mapping`` ABC does not include ``tuple`` or ``list``, although these
   can be used as products.
 
-* The ``dict`` class (and ``list``, which can also function as a product) has
-  a variable number of entries.  So ``Rec()`` should include a way to specify
-  a type for "other" values.
+* The ``dict`` class (and ``list``, which can also function as a product,
+  indexed by integers) has a variable number of entries.  So ``Rec()`` should
+  include a way to specify a type for "other" values.
 
-* Class attributes can also look like products, but use ``__get­attr__()``
-  rather than ``__get­item__()``.  This can be described with ``Atr()`` [#]_.
-  To avoid the need to specify all attributes on a class, ``Atr()`` should be
-  open to additional entries (unlike ``Rec()``, which is closed unless a
-  default type is specified).
+* Class attributes look like products, but use ``__get­attr__()`` rather than
+  ``__get­item__()``.
+
+The final point can be addressed with a new specification, ``Atr()`` [#]_.  To
+avoid the need to specify all attributes on a class, ``Atr()`` should be open
+to additional entries (unlike ``Rec()``, which is closed unless a default type
+is specified).
 
 .. [#] ``Atr()`` has an advantage over ``Rec()``: it does not require
    dependent types when reduced to ABCs with type annotations because each
@@ -416,8 +418,8 @@ set of types — there are various related ideas:
 
 * Using ``None`` to indicate a missing value.
 
-* The use of conditional code that either tests types (eg. ``if
-  isinstance()``) or returns multiple types from a single function.
+* The use of conditional code that either tests types — eg. ``if
+  isinstance()`` — or returns multiple types from a single function.
 
 * Subclassing and method dispatch.
 
@@ -425,8 +427,8 @@ This suggests a relationship between sum types, conditionals and dispatch;
 something that will become clearer in ``pytyp``'s support for dynamic
 dispatch.
 
-Because we are describing a metadata schema (and not a type system) we will
-not "know" the current type for a value associated with a sum.  Iteration must
+Because type specifications are metadata (and not a type system) we will not
+"know" the current type for a value associated with a sum.  Iteration must
 attempt each possible type in turn, until one succeeds.  With nested types
 this becomes a depth–first search over value / type combinations that
 backtracks on failures related to type errors.
@@ -514,13 +516,17 @@ ABCs
 ~~~~
 
 ``Pytyp`` provides "parametric ABCs".  So, for example, ``Seq(int)`` is a call
-to the type sequence constructor ``Seq`` that returns an ABC representing
-sequences of integers.  The value of ``Seq(int)`` is a dynamically generated
-ABC, cached in ``Seq`` so that subsequent calls with the same type argument
-receive the same instance.
+to the type sequence constructor ``Seq`` that returns a dynamically generated
+ABC representing sequences of integers.  The ABC is cached in ``Seq`` so that
+subsequent calls with the same type argument receive the same instance.
 
 Like ABCs that already exist in Python, you can subclass ``Seq(int)``, or
-register a class.  In addition, you can also register hashable instances.
+register a class.  In addition, you can also register hashable instances::
+
+    >>> ilist = HashableList(1,2,3)
+    >>> Seq(int).register_instance(ilist)
+    >>> isinstance(ilist, Seq(int))
+    True
 
 Class Hierarchy
 ...............
@@ -548,11 +554,11 @@ The full class hierarchy is shown below (subclassed or registered to right;
   Cls -- Cls(*) -- Cls(X)        # Class
 
 None of the ABCs have abstract or mixin methods.  ``Foo(*)`` implies a default
-``object`` argument (eg. ``Seq()`` is equivalent to ``Seq(object)``).
+``object`` argument, so ``Seq()`` is equivalent to ``Seq(object)``.
 
 Several additional classes modify behaviour.  Classes with ``NoNormalize`` as
 an *immediate* superclass are considered to be type specifications during
-normalization (other classes will be wrapped by ``Cls()``).  ``NoStructural``
+normalization; other classes will be wrapped by ``Cls()``.  ``NoStructural``
 identifies classes that inherit from type specifications and so do not need
 structural verification.  Subclasses of ``Atomic`` are displayed without the
 ``Cls()`` wrapper.
@@ -562,9 +568,9 @@ Construction and Inheritance
 
 ``Cls(X)`` is the type specification for class ``X``.  It is not always needed
 (eg. ``Seq(int)`` and ``Seq(Cls(int))`` are equivalent), but removes ambiguity
-when using classes that are themselves type specifications.  Consider the
-difference between ``Seq(int)`` and ``Cls(Seq(int))``: the former represents a
-sequence; the latter represents the class ``Seq(int)``.
+when using classes that are themselves type specifications.  For an example,
+consider the difference between ``Seq(int)`` and ``Cls(Seq(int))``: the former
+represents a sequence; the latter represents the class ``Seq(int)``.
 
 Unfortunately, this leads to a problem: if the subclass relation is transitive
 then we cannot reliably test for the types of type specifications.  Consider
@@ -586,15 +592,14 @@ usual relationship between ``isinstance()`` and ``issubclass()`` (eg. both
 the case for any value of ``X``, including ``object`` itself.  So any class
 can be a subclass of ``Cls``. 
 
-In other words, there is a conflict between "is X a type within the type
-specification Y?" and "is X a type specification of type Y?"
-
-To address this the library has the following structure:
+There is a conflict between "is X a type within the type specification Y?" and
+"is X a type specification of type Y?"  To address this the library has the
+following structure:
 
 * **Type Specification Constructors** (eg. ``Cls``, ``Seq``) are ordinary
   classes whose ``__new__`` methods act as factories for type specifications.
 
-* **Type Specifications** (eg. ``Cls(X)``, ``Seq()``) are [#]_ dynamically
+* **Type Specifications** like ``Cls(X)`` and ``Seq()`` are [#]_ dynamically
   created classes, cached in the type constructor by type arguments, that have
   a ``TSMeta`` metaclass.
 
@@ -669,8 +674,8 @@ with a ``spec`` of ``int``.  In this case ``name`` will be None, but for
 The callback can recursively call ``_for_each()`` or ``_back­track()`` on
 any sub–specifications, allowing the entire data structure to be processed.
 
-The difference between the two methods is how they handle sum types (which
-have multiple possible types for a single value).
+The two methods differ in how they handle sum types (which have multiple
+possible types for a single value).
 
 For Each
 ........
@@ -706,18 +711,22 @@ possible value / type combinations.  The ``_back­track()`` routine makes this
 explicit: failure is indicated by raising an exception; the exception is
 caught and the next alternative tried.
 
-In this approach, ``callback()`` receives only a single type for each value in
-a sum (other types are tried on alternative calls, if an exception is raised).
-The code for structural type verification becomes::
+.. compound::
 
-    def callback(current, vsn):
-	for (value, spec, name) in vsn:
-	    if not isinstance(value, spec): 
-                raise TypeError
-	return True
+  In this approach, ``callback()`` receives only a single type for each value
+  in a sum (other types are tried on alternative calls, if an exception is
+  raised).  The code for structural type verification becomes
 
-This is simpler than above because the logic for handling sum types is moved
-to ``_backtrack()`` itself.
+  ::
+
+      def callback(current, vsn):
+	  for (value, spec, name) in vsn:
+	      if not isinstance(value, spec): 
+		  raise TypeError
+	  return True
+
+  which is simpler than above because the logic for handling sum types is
+  moved to ``_backtrack()`` itself.
 
 Examples
 ~~~~~~~~
@@ -803,8 +812,8 @@ community.  And I suspect that they will not, in general, be supportive of the
 idea of "adding types" to Python.
 
 However, the work described here does not implement, or advocate, a static
-type system.  Instead, it builds on ideas already present in the language
-(ABCs, type annotations, ``is­instance()``) to add optional features that
+type system.  Instead, it builds on ideas already present in the language —
+ABCs, type annotations, ``is­instance()`` — to add optional features that
 respect the language semantics.  For example, ``Rec(int, str)`` can describe a
 ``dict`` with keys ``1`` and ``2``, a tuple, a even a list of length 2; no
 structure is imposed on the user beyond the attribute–based protocol
@@ -818,20 +827,18 @@ way.  So they highlight inconsistencies.  That specifications are possible at
 all implies that Python is already a regularly structured language, but some
 irregularities have surfaced and I will describe them below.
 
-SUMMARY HERE?
-
 Type Annotations
 ................
 
 When developing ``pytyp`` my initial intention was for type specifications to
 be syntactic sugar that add type annotations to ABCs.  This would make the
 type parameters explicit.  Instead, the current implementation stores the
-parameters in dynamically generated ABCs.
+parameters internally.
 
 So type annotations are less central to this work than I expected.  This is
 largely because **generators — which are particularly important for
-collections — do not allow for type annotations**.  This makes it difficult to
-extend ABCs with annotations in a consistent way.
+collections — do not allow for type annotations**.  Which makes it difficult
+to extend ABCs with annotations in a consistent way.
 
 The significance of the need for dependent types, when describing ``Rec()``
 with ABCs and type annotations, is debatable.  While type specifications are
@@ -885,6 +892,17 @@ Python depends on the *absence* of ``__hash__()`` and ``__eq__()``.  The
 ABCs that switches to structural verification when registration is impossible
 (ie. for unhashable instances).
 
+Copy on write data structures [#]_ suggest an interesting way to address this
+issue.  Their nature makes it easy to detect and record mutation.  So hashing
+of mutable structures could be allowed, but "immutable references", in a
+similar way to weak references, would expire when the data change.  This would
+remove, or at least reduce, the need for inefficient, structural verification
+of types.
+
+.. [#] http://pypi.python.org/pypi/blist
+   http://www.python.org/dev/peps/pep-3128/ 
+   
+
 AttributeError is a TypeError
 .............................
 
@@ -926,15 +944,15 @@ inference.  This could be a function, called at runtime, that uses type
 annotations to connect different type specifications together.  For example,
 it could answer questions like "if I call function X with types Y and Z, what
 will the type of the result be?"  The additional information Y and Z may help
-constrain the type or the result (resolving sum types, for example).
+constrain the type of the result (resolving sum types, for example).
 
 Negative Cache
 ..............
 
-``ABCMeta`` contains both a register and a negative cache for classes (the
-cache tracks classes that are known not to be subclasses).  ``TSMeta`` is a
-minimal extension of that code, which adds a register for instances, but does
-not include a corresponding cache.  It is possible that a more careful
+``ABCMeta`` contains both a class register and a negative cache (the cache
+tracks classes that are known not to be subclasses).  ``TSMeta`` is a minimal
+extension of that code, which adds a register for instances, but does not
+include a corresponding negative cache.  It is possible that a more careful
 implementation would be more efficienct.
 
 Inheritance, Types as Sets
@@ -1032,9 +1050,9 @@ it is known::
     >>> d
     Delayed(Alt(int,...,str))
 
-``isinstance()`` will raise a ``RecursiveType`` exception on recursive
-verification of a recursive type (typically this is handled by backtracking in
-``Alt()``).
+``Isinstance()`` will raise a ``RecursiveType`` exception on recursive
+verification of a recursive type; typically this is handled by backtracking in
+``Alt()``.
 
 Dynamic Dispatch and Iteration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

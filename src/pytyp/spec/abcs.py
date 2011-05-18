@@ -1,4 +1,3 @@
-
 #LICENCE
 
 from abc import ABCMeta, abstractmethod
@@ -421,9 +420,11 @@ class Rec(Product, FmtArgsMixin):
     def __new__(cls, *args, _dict=None, **kargs):
         if cls is Rec: # check args only when being used as a class factory
             if _dict: kargs.update(_dict) 
+            if not args and not kargs: kargs = {'__': ANY}
+            # careful to use normalised form here
             kargs = dict((Rec.OptKey.pack(name), arg) for (name, arg) in kargs.items())
             spec = _polymorphic_subclass((cls, Container), args, kargs)
-            if args or kargs:
+            if args or kargs != {Rec.OptKey(''):ANY}:
                 Rec().register(spec)
             return spec
         else:
@@ -459,6 +460,10 @@ class Rec(Product, FmtArgsMixin):
         else:
             for name in names:
                 yield (value[name], None, name)
+                
+    @classmethod
+    def _to_dict(cls):
+        return dict(cls._abc_type_arguments)
 
     @classmethod
     def _int_keys(cls):

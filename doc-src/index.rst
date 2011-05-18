@@ -2,48 +2,57 @@
 Welcome to Pytyp's documentation!
 =================================
 
-.. warning::
-
-   This project is Python 3 **only**.
-
 Pytyp is a small collection of utilities that help you write declarative code:
 instead of saying how something should be done, you describe what the results
-look like.
+look like (:ref:`examples <examples>`):
 
-* The :mod:`pytyp.spec.abcs` module gives you tools to describe Python
-  3 data in more detail.  This makes it easier to say what you want, and to
-  write libraries that support a declarative style.
+Describe Python 3 data in more detail
+  :mod:`pytyp.spec.abcs` makes it
+  easier to say what you want, and to write libraries that support a
+  declarative style.
 
-* The :mod:`<pytyp.s11n>` package contains modules (:mod:`JSON
-  <pytyp.s11n.json>` and :mod:`YAML <pytyp.s11n.yaml>`) that map serialised
-  data to Python objects (and back again).  This is a good example of
-  declarative code - you say what classes you want, and the routine works out
-  how to construct them.
+Map serialised data to Python objects (and back again)
+  :mod:`pytyp.s11n` contains modules (:mod:`pytyp.s11n.json` and
+  :mod:`pytyp.s11n.yaml`) that transform JSON and YAML data.  This is a good
+  example of declarative code - you say what classes you want, and the routine
+  works out how to construct them.
 
-* The :mod:`check <pytyp.spec.check>` module provides a decorator to verify
-  that function arguments are of the type expected.
+Verify function arguments
+  :mod:`pytyp.spec.check` provides a decorator to verify that function
+  arguments are of the type expected.
 
-* The :mod:`dispatch <pytyp.spec.dispatch>` module supports dynamic dispatch
-  by type.  This lets you split complex functions into separate parts,
-  depending on the arguments given.
+Use dynamic dispatch by type
+  :mod:`pytyp.spec.dispatch` module lets you split complex functions into
+  separate parts, depending on the arguments given.
 
-* The :mod:`checkrecord <pytyp.spec.record>` module contains a useful class
-  that is both a dict and an object (so you can use attributes instead of 
-  ``[]``, and vice versa).
+Use attributes instead of ``[]``, and vice versa
+  :mod:`pytyp.spec.record` contains a useful class that is both a dict and an
+  object.
 
-.. warning::
+.. note::
+
+   The ideas behind this library are described in the paper `Algebraic ABCs
+   <http://www.acooke.org/pytyp.pdf>`_.
 
    The library has been almost completely rewritten for the 2.0 release.
    Public APIs have changed.  You may need to fix your code when updating.
+
+Installation and Support
+------------------------
 
 To install from `Pypi <http://pypi.python.org/pypi/pytyp>`_::
 
   easy_install pytyp
 
+.. warning::
+
+   This project is Python 3 **only**.
+
 For source see `Google Code <http://code.google.com/p/pytyp/>`_; for support
 email `Andrew Cooke <mailto:andrew@acooke.org>`_.
 
-Contents:
+Contents
+--------
 
 .. toctree::
    :maxdepth: 1
@@ -55,9 +64,35 @@ Contents:
    licence
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
 
+.. _examples:
+
+Examples
+--------
+
+Testing type specifications (:mod:`pytyp.spec.abcs`)::
+
+    >>> isinstance([1,2,None,3], Seq(Opt(int)))
+    True
+    >>> isinstance([1,2,None,3.0], Seq(Opt(int)))
+    False
+
+Creating Python classes from JSON data:
+
+
+
+Verifying function arguments (:mod:`pytyp.spec.check`)::
+
+    >>> def myfunction(a:int, b:str) -> int:
+    ...     return len(a * b)
+    >>> myfunction(2, 'foo')
+    6
+    >>> myfunction('oops', 'banana')
+    Traceback (most recent call last):
+      ...
+    TypeError: Type str inconsistent with 'oops'.

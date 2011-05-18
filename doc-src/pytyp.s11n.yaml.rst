@@ -1,4 +1,11 @@
 
+.. automodule:: pytyp.s11n.yaml
+
+.. testsetup::
+
+  from pytyp.s11n.yaml import *
+
+
 YAML Serialisation (pytyp.s11n.yaml)
 ====================================
 
@@ -13,16 +20,22 @@ means you can access values using attributes rather than named indices).
   package is not present then the functionality defined here will not be
   available.
 
-.. automodule:: pytyp.s11n.yaml
-
 Encoding
 --------
+
+.. tip::
+
+   For background details see :ref:`encoding` and :ref:`type_specs`.
 
 .. autofunction:: dump
 .. autofunction:: dump_all
 
 Decoding
 --------
+
+.. tip::
+
+   For background details see :ref:`decoding` and :ref:`type_specs`.
 
 .. autofunction:: make_load
 .. autofunction:: make_load_all

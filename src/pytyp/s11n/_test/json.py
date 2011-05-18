@@ -32,6 +32,7 @@ from pytyp.s11n.json import make_JSONDecoder, JSONEncoder
 from pytyp._test.support import SimpleArgs, NamedArgs, MixedArgs, TypedArgs, \
     Config, User, Permission
 from pytyp.spec.abcs import Alt
+from pytyp.spec.record import record
 
 
 class JSONDecoderTest(TestCase):
@@ -40,6 +41,7 @@ class JSONDecoderTest(TestCase):
         JSONDecoder = make_JSONDecoder(type_)
         result = JSONDecoder().decode(value)
         assert result == target, result 
+        return result
     
     def test_native(self):
 #        self.assert_decode(str, '"abc"', 'abc')
@@ -59,6 +61,10 @@ class JSONDecoderTest(TestCase):
                            '{"y": {"a": 1, "c": 3, "b": 2}, "x": {"q": 2, "p": 1}}', 
                            TypedArgs(NamedArgs(1, 2), SimpleArgs(1, 2, 3)))
         
+    def test_record(self):
+        R = record('R', '__:ANY')
+        r = self.assert_decode(R, '{"a": 1, "c": 3, "b": 2}', R(a=1,b=2,c=3)) 
+        assert r.a == 1
         
 class ConfigTest(TestCase):
     

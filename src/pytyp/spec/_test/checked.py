@@ -29,6 +29,7 @@
 from unittest import TestCase
 
 from pytyp.spec.check import checked
+from pytyp.spec.abcs import Seq, Rec
 
 
 @checked
@@ -44,6 +45,14 @@ class Checked():
     @checked
     def bad_len(self, s:str) -> int:
         return 'wrong'
+    
+    @checked
+    def args(self, *args:Seq(int)):
+        return args
+
+    @checked
+    def kargs(self, **kargs:Rec(a=int,__=str)):
+        return kargs
 
 
 class CheckedTest(TestCase):
@@ -66,6 +75,28 @@ class CheckedTest(TestCase):
             pass
         try:
             c.bad_len('abc')
+            assert False, 'Expected error'
+        except TypeError:
+            pass
+
+    def test_args(self):
+        c = Checked()
+        r = c.args(1,2)
+        assert r == (1,2)
+        try:
+            c.args('poop')
+            assert False, 'Expected error'
+        except TypeError:
+            pass
+        
+    def test_kargs(self):
+        c = Checked()
+        r = c.kargs(a=1)
+        assert r == {'a': 1}
+        r = c.kargs(a=1,b='two',c='three')
+        assert r == {'a': 1, 'b':'two', 'c':'three'}
+        try:
+            c.args('poop')
             assert False, 'Expected error'
         except TypeError:
             pass

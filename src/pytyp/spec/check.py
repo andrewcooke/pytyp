@@ -1,17 +1,24 @@
+#LICENCE
 
 from inspect import getcallargs, getfullargspec
 from functools import wraps
 
-from pytyp.spec.abcs import type_error, TSMeta
+from pytyp.spec.abcs import type_error, normalize
 
 
 def verify(value, spec):
-    spec = TSMeta._normalize(spec)
+    '''
+    If ``value`` is *not* an instance of ``spec`` then raise a ``TypeError``.
+    '''
+    spec = normalize(spec)
     if not isinstance(value, spec):
         type_error(value, spec)
         
         
 def verify_all(callargs, annotations):
+    '''
+    Helper to verify a set of values against the appropriate type annotations.sy
+    '''
     for name in annotations:
         spec = annotations[name]
         try:
@@ -21,7 +28,10 @@ def verify_all(callargs, annotations):
     
         
 def unpack(func):
-    annotations = dict((name, TSMeta._normalize(spec))
+    '''
+    Separate the return specification from the rest.
+    '''
+    annotations = dict((name, normalize(spec))
                        for (name, spec) in getfullargspec(func).annotations.items())
     try:
         rspec = annotations.pop('return')
@@ -34,7 +44,7 @@ def unpack(func):
 
 def checked(func):
     '''
-    A decorator that adds **runtime verification of type annotations** to a
+    A decorator that adds runtime verification of type annotations to a
     function or method.
 
       >>> @checked

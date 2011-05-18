@@ -1,3 +1,4 @@
+#LICENCE
 
 from collections import OrderedDict
 from string import whitespace

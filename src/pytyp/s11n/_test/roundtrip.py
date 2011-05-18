@@ -33,11 +33,35 @@ from pytyp._test.support import SimpleArgs, NamedArgs, ArgsAndKArgs,\
     MissingKArgs, TypedKArgs
 
 
+class Example():
+    
+    def __init__(self, foo):
+        self.foo = foo
+        
+    def __repr__(self):
+        return '<Example({0})>'.format(self.foo)
+    
+    def __eq__(self, other):
+        return self.foo == other.foo
+    
+
+class Container():
+
+    def __init__(self, *examples:[Example]):
+        self.examples = list(examples) # avoid issues with tuple/list
+        
+    def __repr__(self):
+        return '<Container({0})>'.format(','.join(map(repr, self.examples)))
+    
+    def __eq__(self, other):
+        return other.examples == self.examples
+
+
 class RoundtripTest(TestCase):
     
-    def assert_roundtrip(self, spec, obj, target=None, strict=True):
+    def assert_roundtrip(self, spec, obj, target=None):
         target = target or obj
-        intermediate = encode(obj, strict=strict)
+        intermediate = encode(obj)
         result = decode(intermediate, spec)
         assert result == target, result
         
@@ -55,7 +79,12 @@ class RoundtripTest(TestCase):
                                                foo=7, bar=8))
             assert False, 'expected error'
         except TypeError as e:
-            assert 'Cannot encode *args in a map' in str(e)
+            print(e)
+            assert 'Cannot encode' in str(e)
+            
+    def test_args_as_list(self):
+        self.assert_roundtrip(Container,
+                              Container(Example('abc'), Example('xyz')))
 
     # uses *args in map
 #    def test_missing_kargs(self):
@@ -84,3 +113,5 @@ class RoundtripTest(TestCase):
         
     def test_typed_kargs(self):
         self.assert_roundtrip(TypedKArgs, TypedKArgs(foo=SimpleArgs(1,2,3)))
+
+

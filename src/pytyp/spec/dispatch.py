@@ -49,5 +49,4 @@ class Overload:
         wrapper.previous = lambda *args, **kargs: previous(wrapper.obj, *args, **kargs)
         return wrapper
     
-
 overload = Overload

@@ -29,7 +29,7 @@
 from json import JSONDecoder as JSONDecoder_, load as load_, loads as loads_, \
     JSONEncoder as JSONEncoder_, dump as dump_, dumps as dumps_
 
-from pytyp.s11n.base import encode, decode
+from pytyp.s11n.base import encode, decode, Encoder
 from pytyp.spec.abcs import Atomic
 
 
@@ -106,20 +106,10 @@ def dumps(obj, **kargs):
     return dumps_(obj, cls=JSONEncoder, **kargs)
 
 
-def make_JSONEncoder(raw):
+class JSONEncoder(JSONEncoder_):
+    
+    default = Encoder(recurse=False)
 
-    class JSONEncoder(JSONEncoder_):
-        
-        def default(self, obj):
-            return encode(obj, raw=raw, recurse=False)
-        
-    return JSONEncoder
-
-
-JSONEncoder = make_JSONEncoder(Atomic)
-'''
-A custom encoder for the Python json module.
-'''
 
 
 def make_load(spec):
@@ -166,8 +156,11 @@ def make_loads(spec):
       ...         return '<Container({0})>'.\
                       format(','.join(map(repr, self.examples)))
       >>> loads = make_loads(Container)
-      >>> loads('{"examples": [{"foo":"abc"}, {"foo":"xyz"}]}')
+      >>> loads('[{"foo":"abc"}, {"foo":"xyz"}]')
       <Container(<Example(abc)>,<Example(xyz)>)>
+      
+    (note that here, because ``Container`` uses ``*args``, it is represented as
+    a list, not a dict).
     '''
     cls = make_JSONDecoder(spec)
     def loads(s, **kargs):

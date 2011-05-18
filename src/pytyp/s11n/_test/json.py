@@ -95,7 +95,9 @@ class JSONEncoderTest(TestCase):
     
     def assert_encode(self, value, target):
         result = self.__encoder.encode(value)
-        assert result == target, result  
+        if result != target:
+            target = target.translate({'"':"'", "'":'"'})
+        assert result == target, (result, target, type(result))  
     
     def test_encode_native(self):
         self.assert_encode('abc', '"abc"')

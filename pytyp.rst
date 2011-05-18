@@ -87,7 +87,7 @@ Introduction
 
 Some languages have static type systems, letting the compiler check for errors
 before the program is run.  Often, in languages like Java, this seems more of
-a hinderance than a help; many people prefer Python for the freedom associated
+a hindrance than a help; many people prefer Python for the freedom associated
 with a lack of type declarations.
 
 But other languages — like Haskell and Scala — are using types in interesting
@@ -128,10 +128,10 @@ introspective, structural verification could be an option [#]_::
 
 .. [#] This particular example is not a valid ``pytyp`` specification.  For
    practical reasons (the need to introduce a new metaclass, and the
-   difficulty in modfying existing ABCs) the final library uses
+   difficulty in modifying existing ABCs) the final library uses
    ``Seq(Opt(int))``.
 
-A concete implementation of all this (and more!) is described in `The Pytyp
+A concrete implementation of all this (and more!) is described in `The Pytyp
 Library`_ (and `Appendix: Further Details`_).
 
 Finally, in `Conclusions`_, I review the most import lessons from this work.
@@ -167,7 +167,7 @@ universally referred to as its type and available at runtime via the
 .. [#] Where it matters, I am discussing only Python 3.
 
 However, the attributes associated with an object are not fixed — it is
-possible to modify objects through various mechanisms (including meta-classes
+possible to modify objects through various mechanisms (including metaclasses
 and direct manipulation of the underlying dictionaries) — and the language
 runtime does not use the object's class to guide execution [#]_.  Instead,
 **each operation succeeds or fails depending on whether any necessary
@@ -263,7 +263,7 @@ is called "duck typing" and, as described above, depends on the availability
 of object attributes.
 
 Recent work has started to build on this foundation by reifying collections of
-attributes (ABCs) and allowing metdata (formatted in a manner traditionally
+attributes (ABCs) and allowing metadata (formatted in a manner traditionally
 associated with types) to be specified on functions.  However, ABCs act only
 as an unverified marker; runtime checks are restricted to a few special cases.
 Nor are type annotations verified.
@@ -296,14 +296,14 @@ current approach.
 .. [#] It is verbose, particularly when all methods are defined; type
    annotations don't exist for generators
    http://mail.python.org/pipermail/python-3000/2006-May/002103.html; it is
-   unclear how to backfit types to an existing API; type annotations are not
+   unclear how to back-fit types to an existing API; type annotations are not
    "implemented"; it supports only homogenous sequences (as is normal with
    current type systems).
    
 One problem is easy to fix.  We can define a simpler syntax: ``[int]`` or,
 more formally, ``Seq(int)``.  I will call this a *type specification*.
 
-This can be extended to inhomogenous collections: dictionaries would look like
+This can be extended to inhomogeneous collections: dictionaries would look like
 ``{'a':int, 'b':str}``; tuples like ``(int, str)``.  A unified syntax is
 ``Rec(a=int, b=str)`` or ``Rec(int, str)`` (named arguments are assumed to be
 string keys; unnamed arguments have implicit integer indices: 0,1,2...).
@@ -336,7 +336,7 @@ Alternatively, we can use the existing registration and subclass mechanisms,
 which are more suited to user–defined classes.
 
 **Identification** of a collection's type, although superficially similar to
-verfication, is a harder problem.  There is not always a single, well–defined
+verification, is a harder problem.  There is not always a single, well–defined
 answer.  In some simpler cases we may have a set of candidate types, in which
 case we can verify them in turn, in other cases the instance's class may
 inherit from one or more ABCs.  But I don't see a good, "pythonic" solution to
@@ -484,7 +484,7 @@ largely at the instance level::
 
 In addition, because the specifications above are built using classes, we need
 a syntax to distinguish classes used as types [#]_ and another to allow
-dispatch by type (see `Dynamic Dispatch and Iteration`_ below)::
+dispatch by type (see `Dynamic Dispatch by Type`_ below)::
 
     Cls(c)       # Instances of c
     Sub(c)       # Subclasses of c
@@ -558,7 +558,7 @@ None of the ABCs have abstract or mixin methods.  ``Foo(*)`` implies a default
 
 Several additional classes modify behaviour.  Classes with ``NoNormalize`` as
 an *immediate* superclass are considered to be type specifications during
-normalization; other classes will be wrapped by ``Cls()``.  ``NoStructural``
+normalisation; other classes will be wrapped by ``Cls()``.  ``NoStructural``
 identifies classes that inherit from type specifications and so do not need
 structural verification.  Subclasses of ``Atomic`` are displayed without the
 ``Cls()`` wrapper.
@@ -728,6 +728,83 @@ caught and the next alternative tried.
   which is simpler than above because the logic for handling sum types is
   moved to ``_backtrack()`` itself.
 
+Dynamic Dispatch by Type
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Type specifications are metadata, implemented as ABCs, that can make APIs more
+declarative.  Libraries that take this approach, like the JSON support in
+``pytyp``, are driven by the metadata.  Unfortunately, a simple implementation
+is necessarily littered with calls to ``isinstance()`` and ``is­sub­class()``,
+needed to interpret the metadata.
+
+In Python, frequent testing of types is poor programming; tests should be
+replaced by OO method dispatch (the called me­thod will have multiple
+implementations, depending on the type).  In this way type dependence becomes
+implicit.
+
+The equivalent is not possible with type specifications — it implies calling
+class methods on the ABCs themselves — so an alternative dispatch mechanism is
+needed.  I have found dispatch by type, implemented as a decorator, to be
+extremely useful in these cases.
+
+.. compound::
+
+  Here is a fragment of code used to encode data as JSON
+
+  ::
+
+    class Encoder:
+
+	@overload    
+	def __call__(self, value):
+	    return value
+
+	@__call__.intercept
+	def object(self, value):
+	    try:
+		argspec = getfullargspec(init)
+	    except TypeError:
+		return self.object.previous(value)
+	    ...
+
+	@__call__.intercept
+	def list(self, value:Sequence):
+	    return list(map(self.recurse, value))
+
+	@__call__.intercept
+	def map(self, value:Mapping):
+	    return dict((name, self.recurse(value))
+			for (name, value) in value.items())
+
+  which illustrates how the decorator is used.  All the methods shown are
+  accessed by calling an instance of ``Encoder`` as a function; ie. via
+  ``__call__()``.  This works as follows:
+
+* The target method (and default implementation) is marked with ``@overload``.
+
+* Other methods, one of which may be called *instead* of the target, are
+  marked with ``.intercept``.  Methods are tried "from bottom to top";
+  arguments are checked against type annotations and the first successful
+  match is invoked.
+
+* Methods can explicitly pass the call up the chain by calling ``.previous()``
+  on the current method (see ``object()`` above).
+
+.. compound::
+
+  The example above, chosen for compactness, tests instances.  When working
+  with type specifications (ABCs) it is also useful to test subclasses.  This
+  explains the ``Sub()`` (pseudo–)type specification.  For example,
+
+  ::
+
+    @__call__.intercept
+    def rec(self, value, spec:Sub(Rec)):
+        ....
+
+  will be invoked when the ``spec`` argument is a *subclass* of ``Rec`` — a
+  type specification for a record.
+
 Examples
 ~~~~~~~~
 
@@ -770,8 +847,7 @@ decoding (implemented through nested iteration, as outlined earlier)::
   ...         return '<Container({0})>'.format(
   ...             ','.join(map(repr, self.examples)))
   >>> loads = make_loads(Container)
-  >>> loads('{"examples": '
-  ...         '[{"foo":"abc"}, {"foo":"xyz"}]}')
+  >>> loads('[{"foo":"abc"}, {"foo":"xyz"}]')
   <Container(<Example(abc)>,<Example(xyz)>)>
 
 Conclusions
@@ -803,6 +879,10 @@ left to the client, or supported within the library.
 
 ``Pytyp`` uses iteration to provide structural verification of types and the
 guided conversion of JSON data to Python classes.
+
+Type specifications can help make APIs more declarative, but implementations
+must then be driven by the metadata.  The resulting code is improved with
+dynamic dispatch by type, implemented as method decorators.
 
 Pythonic
 ~~~~~~~~
@@ -916,7 +996,7 @@ In the context of duck typing, ``AtrributeError`` **should be a subclass of**
 Additional Issues in ``Pytyp``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Efficicency
+Efficiency
 ...........
 
 The issues above also affect ``pytyp``.  In addition, as with any pure–Python
@@ -957,7 +1037,7 @@ Negative Cache
 tracks classes that are known not to be subclasses).  ``TSMeta`` is a minimal
 extension of that code, which adds a register for instances, but does not
 include a corresponding negative cache.  It is possible that a more careful
-implementation would be more efficienct.
+implementation would be more efficient.
 
 Inheritance, Types as Sets
 ..........................
@@ -1057,60 +1137,6 @@ it is known::
 ``Isinstance()`` will raise a ``RecursiveType`` exception on recursive
 verification of a recursive type; typically this is handled by backtracking in
 ``Alt()``.
-
-Dynamic Dispatch and Iteration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-While developing ``pytyp`` I made various experiments with dispatch by type.
-The most readable solution has the following form::
-
-    >>> sexpr = Delayed()
-    >>> sexpr.set(Alt(Seq(sexpr), ANY))
-    
-    >>> class Count:
-    ...
-    ...     def count(self, vsn):
-    ...         (value, spec, _) = vsn
-    ...         try:
-    ...             return spec._for_each(value, self)
-    ...         except TypeError:
-    ...             return 1
-    ...
-    ...     @overload
-    ...     def __call__(self, spec, vsn):
-    ...         return sum(map(self.count, vsn))
-    ...
-    ...     @__call__.intercept
-    ...     def sum(self, spec:Sub(Sum), vsn):
-    ...         for entry in vsn:
-    ...             try:
-    ...                 return self.count(entry)
-    ...             except TypeError:
-    ...                 pass
-
-    >>> sexpr._for_each([1,2,[3,[4,5],6,[7]]], Count())
-    7
-
-The ``__call__`` method is marked with the ``overload`` decorator and provides
-the default case.  Alternative cases, with the same arguments, but different
-type annotations, can then "intercept" the call to that method, to provide
-results specific to the restricted argument types.
-
-The ``Sub()`` type specification used above is similar to ``Cls()``, but is
-verified with ``issubclass()`` rather than ``isinstance()``.  This allows
-dispatch on a type specification.
-
-A better solution for this particular example, however, would use the
-backtracking support that ``pytyp`` already provides::
-
-    >>> def count(_, vsn):
-    ...     try:
-    ...         return sum(s._backtrack(v, count) 
-    ...                    for (v, s, _) in vsn)
-    ...     except AttributeError:
-    ...         return 1
-    >>> sexpr._backtrack([1,2,[3,[4,5],6,[7]]], count)
-    7
 
 Record
 ~~~~~~

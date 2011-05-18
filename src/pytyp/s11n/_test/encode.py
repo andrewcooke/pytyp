@@ -29,17 +29,59 @@
 from unittest import TestCase
 
 from pytyp._test.support import SimpleArgs
-from pytyp.s11n.base import encode
+from pytyp.s11n.base import Encoder, EncodeError
+
+
+class Example():
+    
+    def __init__(self, foo):
+        self.foo = foo
+        
+    def __repr__(self):
+        return '<Example({0})>'.format(self.foo)
+    
+
+class Container():
+
+    def __init__(self, *examples:[Example]):
+        self.examples = examples
+        
+    def __repr__(self):
+        return '<Container({0})>'.format(','.join(map(repr, self.examples)))
 
 
 class EncodeTest(TestCase):
     
+    def assert_encode(self, value, target=None, encode=Encoder()):
+        if target is None: target = value
+        result = encode(value)
+        assert result == target, result
+        
+    def test_list(self):
+        self.assert_encode([])
+        self.assert_encode([1,2,3])
+        self.assert_encode((1,2,3), [1,2,3])
+    
+    def test_map(self):
+        self.assert_encode({})
+        self.assert_encode({'a':1, 'b':2})
+        
+    def test_atomic(self):
+        self.assert_encode('foo')
+        self.assert_encode(1)
+        self.assert_encode(object())
+        
+    def test_object(self):
+        self.assert_encode(Example('xyz'), {'foo': 'xyz'})
+        self.assert_encode(Container(Example('xyz'), Example('abc')), [{'foo': 'xyz'}, {'foo': 'abc'}])
+    
     def test_circular(self):
+        encode = Encoder()
         s = SimpleArgs(1,2,3)
         s.a = s
         try:
             encode(s)
             assert False, 'Expected error'
-        except ValueError as e:
+        except EncodeError as e:
             assert 'Circular' in str(e), e
-            
+        

@@ -44,7 +44,7 @@ class JSONDecoderTest(TestCase):
         return result
     
     def test_native(self):
-#        self.assert_decode(str, '"abc"', 'abc')
+        self.assert_decode(str, '"abc"', 'abc')
         self.assert_decode(list, '[1, 2.3]', [1,2.3])
         
     def test_classes(self):
@@ -52,7 +52,7 @@ class JSONDecoderTest(TestCase):
         self.assert_decode(NamedArgs, '{"q": 2, "p": 1}', NamedArgs(1, 2))
         self.assert_decode(MixedArgs, '{"y": 2, "x": 1}', MixedArgs(1, 2))
         
-    def test_Alt(self):
+    def test_alt(self):
         self.assert_decode(Alt(NamedArgs, MixedArgs), '{"q": 2, "p": 1}', NamedArgs(1, 2))
         self.assert_decode(Alt(NamedArgs, MixedArgs), '{"y": 2, "x": 1}', MixedArgs(1, 2))
         
@@ -66,6 +66,7 @@ class JSONDecoderTest(TestCase):
         r = self.assert_decode(R, '{"a": 1, "c": 3, "b": 2}', R(a=1,b=2,c=3)) 
         assert r.a == 1
         
+
 class ConfigTest(TestCase):
     
     def test_config(self):

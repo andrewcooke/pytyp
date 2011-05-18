@@ -846,6 +846,10 @@ expressed in the language this may not be a serious problem (dependent types
 can be implemented as Python functions), but it might constrain future options
 to improve efficiency.
 
+It's also worth noting that annotations are obscured by function decorators,
+although ``functools.wraps`` provides a ``__wrapped__`` attribute that can be
+used to chain to the original function.
+
 Named Tuples, ABC Granularity
 .............................
 

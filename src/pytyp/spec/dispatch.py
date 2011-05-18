@@ -1,6 +1,7 @@
 #LICENCE
 
 from collections import OrderedDict
+from functools import wraps
 from inspect import getcallargs
 
 from pytyp.spec.check import unpack, verify_all
@@ -32,6 +33,7 @@ class Overload:
     @staticmethod
     def wrap(method, previous):
         annotation = unpack(method)[0]
+        @wraps(method)
         def wrapper(obj, *args, **kargs):
             callargs = getcallargs(method, obj, *args, **kargs)
             try:

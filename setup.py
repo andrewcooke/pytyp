@@ -8,7 +8,7 @@ Pytyp uses ABCs and function annotations in a consistent, pythonic way that
 supports declarative APIs - instead of saying how to do something, you have
 the ability to say what you want.
 
-It includes::
+It includes:
 
 * A basic set of type specifications for describing collections of data,
   closely integrated into the language::

@@ -28,6 +28,11 @@ A value is verified in one of four ways:
 
 The last of these must inspect all values, so can be inefficient.
 
+.. hint::
+
+  Don't forget that type specifications also work with ``isinstance()`` and
+  ``issubclass()``.
+
 Checked
 -------
 

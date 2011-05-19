@@ -153,8 +153,7 @@ def make_loads(spec):
       ...     def __init__(self, *examples:[Example]):
       ...         self.examples = examples
       ...     def __repr__(self):
-      ...         return '<Container({0})>'.\
-                      format(','.join(map(repr, self.examples)))
+      ...         return '<Container({0})>'.format(','.join(map(repr, self.examples)))
       >>> loads = make_loads(Container)
       >>> loads('[{"foo":"abc"}, {"foo":"xyz"}]')
       <Container(<Example(abc)>,<Example(xyz)>)>

@@ -11,6 +11,9 @@ import pytyp.spec.abcs as abcs
 RESIZE = '__'
 
 
+class RecordException(TypeError): pass
+
+
 def record(typename, field_names, verbose=False, mutable=False, checked=True,
            context=None):
     '''
@@ -18,9 +21,45 @@ def record(typename, field_names, verbose=False, mutable=False, checked=True,
     words: it unifies `Rec()` and `Atr()`; it provides both __..item__ and __..attr__
     access.
     
-    `field_names` should be an argument list in normal Python syntax.  This can
-    include  default values and type annotations.  For example: 'a,b=5' or
-    'a:int,b:Seq(str)'.
+    :param typename: The name of the class to be created.
+    :param field_names: An argument list in normal Python syntax.  This can
+                        include  default values and type annotations.  For example:
+                        'a,b=5' or 'a:int,b:Seq(str)'.
+    :param verbose: (default False) If True the source will be printed to stdout.
+    :param mutable: (default False) If True contents can be changed; it False the
+                    instance can be hashed.
+    :param checked: (default True) If True, initial arguments and future modifications
+                    (if any) are checked against type specifications (if given in
+                    ``field_names``).
+    :param context: (default None) A ``dict`` that can provide access to additional
+                    names used in ``field_names``.  The ``pytyp.spec.abcs`` module
+                    is always available.
+                    
+    Here are some examples::
+    
+        >>> MyTuple = record('MyTuple', ',') # no names or types - like a tuple
+        >>> t = MyTuple(1,2)
+        >>> t[0]
+        1
+        >>> t._1 # attribute access to indexed fields
+        2
+        >>> hash(t)
+        7114083200724408387
+        
+        >>> Record = record('Record', 'a:str,b:int=7', mutable=True)
+        >>> r = Record('foo')
+        >>> r.b
+        7
+        >>> r.b = 41
+        >>> r['a'] = 42
+        Exception raised:
+          ...
+        TypeError: Type str inconsistent with 42.
+        
+        >>> Variable = record('Variable', '__:int')
+        >>> v = Variable(a=1,b=2,c=3)
+        >>> len(v)
+        3
     '''
     _context = dict(abcs.__dict__)
     if context: _context.update(context)
@@ -45,6 +84,7 @@ def class_template(typename, nsd, mutable, checked):
     verify = '\n'.join(map(pad8, fmt_verify(nsd, checked)))
     init_args = ', '.join(fmt_init_args(nsd))
     init_set = '\n'.join(map(pad8, fmt_init_set(nsd)))
+    immutable = '' if mutable else fmt_immutable()
     return '''class {typename}(dict, {typespec}):
     """
     record {typename}:
@@ -54,6 +94,7 @@ def class_template(typename, nsd, mutable, checked):
     {checked}
     def __init__(self, {init_args}):
 {init_set}
+        self.__hash = []
         self._lock = None
     def __setitem__(self, name, value):
         if not {mutable}: raise TypeError('Immutable')
@@ -78,7 +119,24 @@ def class_template(typename, nsd, mutable, checked):
         if hasattr(self, '_lock'):
             if not {mutable}: raise AttributeError('Immutable')
             self.__setitem__(name, value)
-        super().__setattr__(name, value)'''.format(**locals())
+        super().__setattr__(name, value)
+    def __delattr__(self, name):
+        # could delete additional fields
+        raise RecordException('Cannot delete from record')
+    def __delitem__(self, name):
+        # could delete additional fields
+        raise RecordException('Cannot delete from record')
+    def fromkeys(self, *args):
+        raise RecordException('Not supported in record')
+    def pop(self, *args):
+        raise RecordException('Not supported in record')
+    def popitem(self, *args):
+        raise RecordException('Not supported in record')
+    def setdefault(self, *args):
+        raise RecordException('Not supported in record')
+    def update(self, *args):
+        raise RecordException('Not supported in record')
+{immutable}'''.format(**locals())
 
 
 def left(n):
@@ -87,6 +145,14 @@ def left(n):
         return pad + line
     return padder
 
+
+def fmt_immutable():
+    return '''
+    def __hash__(self):
+        if not self.__hash:
+            self.__hash.append(hash(tuple((name, value) for (name, value) in self.items())))
+        return self.__hash[0]'''
+    
 
 def fmt_verify(nsd, checked):
     if checked:

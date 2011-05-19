@@ -48,14 +48,12 @@ describe the data.  The end result stays true to the idea that Python is
 
 .. [#] Abstract Base Classes
 
--------
-
-**DRAFT / WORK IN PROGRESS - Does NOT correspond to released pytyp library**
-(although the latest version at http://www.acooke.org/pytyp.pdf usually
-describes the code in the Hg repo at http://code.google.com/p/pytyp/)
 
 :Author: Andrew Cooke (andrew@acooke.org)
-:Version: 0.17 of 11-05-2011
+:Version: 1.0 / 2011-05-19 / ``pytyp`` v2.0
+:Latest: http://www.acooke.org/pytyp.pdf
+:Source: http://code.google.com/p/pytyp
+
 
 Abstract
 --------
@@ -733,17 +731,15 @@ Dynamic Dispatch by Type
 
 Type specifications are metadata, implemented as ABCs, that can make APIs more
 declarative.  Libraries that take this approach, like the JSON support in
-``pytyp``, are driven by the metadata.  Unfortunately, a simple implementation
-is necessarily littered with calls to ``isinstance()`` and ``is­sub­class()``,
-needed to interpret the metadata.
+``pytyp``, must read and respond to that metadata.  Unfortunately, this can
+result in code littered with calls to ``isinstance()`` and ``is­sub­class()``.
 
-In Python, frequent testing of types is poor programming; tests should be
-replaced by OO method dispatch (the called me­thod will have multiple
-implementations, depending on the type).  In this way type dependence becomes
-implicit.
+The relationship between object types and program logic is usually implicit:
+OO method dispatch selects the correct action without explicit tests (the
+called me­thod will have multiple implementations, depending on the type).
 
-The equivalent is not possible with type specifications — it implies calling
-class methods on the ABCs themselves — so an alternative dispatch mechanism is
+But this not possible with type specifications — it implies calling class
+methods on the ABCs themselves — so an alternative dispatch mechanism is
 needed.  I have found dispatch by type, implemented as a decorator, to be
 extremely useful in these cases.
 
@@ -788,11 +784,11 @@ extremely useful in these cases.
   match is invoked.
 
 * Methods can explicitly pass the call up the chain by calling ``.previous()``
-  on the current method (see ``object()`` above).
+  on the current method (see the ``object()`` method above).
 
 .. compound::
 
-  The example above, chosen for compactness, tests instances.  When working
+  The previous example, chosen for compactness, tests instances.  When working
   with type specifications (ABCs) it is also useful to test subclasses.  This
   explains the ``Sub()`` (pseudo–)type specification.  For example,
 
@@ -882,7 +878,7 @@ guided conversion of JSON data to Python classes.
 
 Type specifications can help make APIs more declarative, but implementations
 must then be driven by the metadata.  The resulting code is improved with
-dynamic dispatch by type, implemented as method decorators.
+dynamic dispatch by type, implemented as method decorators in ``pytyp``.
 
 Pythonic
 ~~~~~~~~
@@ -927,7 +923,7 @@ can be implemented as Python functions), but it might constrain future options
 to improve efficiency.
 
 It's also worth noting that annotations are obscured by function decorators,
-although ``functools.wraps`` provides a ``__wrapped__`` attribute that can be
+although ``functools.wraps`` provides a ``__wrap­ped__`` attribute that can be
 used to chain to the original function.
 
 Named Tuples, ABC Granularity
@@ -976,15 +972,15 @@ Python depends on the *absence* of ``__hash__()`` and ``__eq__()``.  The
 ABCs that switches to structural verification when registration is impossible
 (ie. for unhashable instances).
 
-Copy on write data structures [#]_ suggest an interesting way to address this
-issue.  Their nature makes it easy to detect and record mutation.  So hashing
-of mutable structures could be allowed, but "immutable references", in a
-similar way to weak references, would expire when the data change.  This would
-remove, or at least reduce, the need for inefficient, structural verification
-of types.
+Copy on write data structures [#]_ [#]_ suggest an interesting way to address
+this issue.  Their nature makes it easy to detect and record mutation.  So
+hashing of mutable structures could be allowed, but "immutable references", in
+a similar way to weak references, would expire when the data change.  This
+would remove, or at least reduce, the need for inefficient, structural
+verification of types.
 
 .. [#] http://pypi.python.org/pypi/blist
-   http://www.python.org/dev/peps/pep-3128/ 
+.. [#] http://www.python.org/dev/peps/pep-3128/ 
    
 
 AttributeError is a TypeError

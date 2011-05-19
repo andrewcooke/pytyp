@@ -23,7 +23,7 @@ Encoding
 
 .. autofunction:: dumps
 .. autofunction:: dump
-.. autodata:: JSONEncoder
+.. autoclass:: JSONEncoder
 
 Decoding
 --------

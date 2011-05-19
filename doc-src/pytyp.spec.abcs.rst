@@ -10,10 +10,10 @@
 Type Specifications (pytyp.spec.abcs)
 =====================================
 
-The classes defined in this module let you describe the `type` of data in more
-detail than normal.  For example, ``Seq(Opt(int))`` is a sequence of optional
-integers like ``[1,2,None,3]``.  What you do with that information is up to
-you — pytyp includes some utilities, but you can also build your own.
+The classes defined in this module let you describe the `type` of data in
+detail.  For example, ``Seq(Opt(int))`` is a sequence of optional integers
+like ``[1,2,None,3]``.  What you do with that information is up to you — pytyp
+includes some utilities, but you can also build your own.
 
 To help you use these descriptions they support the following features (based
 on `Python's ABCs <http://docs.python.org/py3k/library/abc.html>`_):
@@ -83,35 +83,35 @@ The different constructors for type specifications are listed below.
 
 Sequences
 ~~~~~~~~~
-.. autodata:: Seq
+.. autoclass:: Seq
 
 Records
 ~~~~~~~
-.. autodata:: Rec
+.. autoclass:: Rec
 
 Attributes
 ~~~~~~~~~~
-.. autodata:: Atr
+.. autoclass:: Atr
 
 Alternatives and Optional
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-.. autodata:: Alt
-.. autodata:: Opt
+.. autoclass:: Alt
+.. autoclass:: Opt
 
 And and Or
 ~~~~~~~~~~
-.. autodata:: And
-.. autodata:: Or
+.. autoclass:: And
+.. autoclass:: Or
 
 Classes
 ~~~~~~~
-.. autodata:: Cls
-.. autodata:: ANY
-.. autodata:: Sub
+.. autoclass:: Cls
+.. autoclass:: ANY
+.. autoclass:: Sub
 
 Normalisation
 ~~~~~~~~~~~~~
-.. autodata:: normalize
+.. autoclass:: normalize
 
 .. _iteration:
 
@@ -268,6 +268,6 @@ Of course, some exceptions should not be treated this way.  So if you want an
 exception to be ignored (ie. to be raised, instead of being used to trigger
 backtracking), then register it with ``NoBacktrack``.
 
-.. autodata:: NoBacktrack
+.. autoclass:: NoBacktrack
 
 

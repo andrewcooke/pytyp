@@ -2,9 +2,11 @@
 Welcome to Pytyp's documentation!
 =================================
 
-Pytyp is a small collection of utilities that help you write declarative code:
-instead of saying how something should be done, you describe what the results
-look like (:ref:`examples <examples>`):
+Utilities that help you write declarative code: instead of saying how
+something should be done, you describe what the results look like
+(:ref:`examples <examples>`).
+
+Pytyp can help you:
 
 Describe Python 3 data in more detail
   :mod:`pytyp.spec.abcs` makes it
@@ -40,7 +42,7 @@ Use attributes instead of ``[]``, and vice versa
 Installation and Support
 ------------------------
 
-To install from `Pypi <http://pypi.python.org/pypi/pytyp>`_::
+To install from `PyPI <http://pypi.python.org/pypi/pytyp>`_::
 
   easy_install pytyp
 

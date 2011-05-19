@@ -5,6 +5,11 @@ Serialisation Support (pytyp.s11n.base)
 Pytyp can *encode* from Python classes to dicts.  It can also *decode* dicts
 back into Python classes.
 
+The functions and classes here form the basis for :mod:`pytyp.s11n.json` and
+:mod:`pytyp.s11n.yaml` - you may find the examples here useful in
+understanding how the process works, but probably want to call the routines in
+those packages.
+
 .. automodule:: pytyp.s11n.base
 
 .. _encoding:
@@ -23,6 +28,7 @@ So, for example, this class can be encoded::
   ...         self.a = a
   ...         self.b = b
   ...
+  >>> encode = Encoder()
   >>> encode(EncExample(1, 2))
   {'a': 1, 'b': 2}
 
@@ -50,7 +56,7 @@ information through read-only properties::
   >>> encode(ReadOnly(1))
   {'value': 1}
 
-.. autofunction:: encode
+.. autoclass:: Encoder
 
 .. _decoding:
 

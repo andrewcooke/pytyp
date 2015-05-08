@@ -753,9 +753,9 @@ class _Set(TypeSpec):
     def transitive_ordered(cls, args):
         '''
         >>> list(And.transitive_ordered([int,And(str,float)]))
-        [<class 'str'>, <class 'float'>, <class 'int'>]
+        [<class 'float'>, <class 'int'>, <class 'str'>]
         >>> list(And.transitive_ordered([float,And(int,str)]))
-        [<class 'str'>, <class 'float'>, <class 'int'>]
+        [<class 'float'>, <class 'int'>, <class 'str'>]
         '''
         def expand(args, flat):
             for arg in args:
@@ -767,7 +767,8 @@ class _Set(TypeSpec):
                     except AttributeError:
                         flat.add(arg)
             return flat
-        return sorted(expand(args, set()), key=id)
+        # used to sort by id() but it's not fixed, so use str() instead (or tests break)
+        return sorted(expand(args, set()), key=str)
 
     @classmethod
     def _vsn(cls, value):

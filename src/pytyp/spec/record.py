@@ -78,7 +78,7 @@ def record(typename, field_names, verbose=False, mutable=False, checked=True,
         7
         >>> r.b = 41
         >>> r['a'] = 42
-        Exception raised:
+        Traceback (most recent call last):
           ...
         TypeError: Type str inconsistent with 42.
         

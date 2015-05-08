@@ -1,0 +1,13 @@
+*~
+*.pyc
+.idea
+_build
+env
+pytyp.aux
+pytyp.iml
+pytyp.log
+pytyp.out
+pytyp.pdf
+pytyp.tex
+pytyp.toc
+texput.log

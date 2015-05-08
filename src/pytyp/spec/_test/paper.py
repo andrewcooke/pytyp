@@ -35,8 +35,15 @@ if __name__ == '__main__':
     from pytyp.spec.dispatch import overload
     from pytyp.s11n.json import *
     from abc import *
+
     class SomeClass: pass
     random_object = SomeClass()
-    print(doctest.testfile('/home/andrew/projects/personal/pytyp/pytyp/pytyp.rst',
+    Sequence = Seq
+    Option = Opt
+    class HashableList(list):
+        def __init__(self, *args): list.__init__(self, args)
+        def __hash__(self): return 0
+
+    print(doctest.testfile('/home/andrew/project/pytyp/pytyp/pytyp.rst',
                            module_relative=False,globs=globals()))
     

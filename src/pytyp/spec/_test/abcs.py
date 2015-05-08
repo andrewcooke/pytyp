@@ -298,7 +298,7 @@ class ClsTest(TestCase):
         class Foo: pass
         assert Cls(Foo, x=int) == And(Cls(Foo), Atr(x=int)), Cls(Foo, x=int)
         r = repr(Cls(Foo, x=int))
-        assert r == "And(Atr(x=int),Cls(Foo))", r
+        assert r == "And(Cls(Foo),Atr(x=int))", r
         
         
 class AndTest(TestCase):

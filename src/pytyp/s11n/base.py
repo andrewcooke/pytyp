@@ -245,10 +245,16 @@ class EncodeError(TypeError): pass
 class Encoder:
     '''
     An instance of this class can be called to encode data::
-    
+
+      >>> class MyClass:
+      ...    def __init__(self, arg1, arg2):
+      ...        self.arg1 = arg1
+      ...        self.arg2 = arg2
+      ...
+      >>> myInstance = MyClass(42, 'foo')
       >>> encode = Encoder()
       >>> encode([1,myInstance,{'a':2}])
-      [1,{'arg1':42, 'arg2':'foo'}, {'a':2}]
+      [1, {'arg1': 42, 'arg2': 'foo'}, {'a': 2}]
       
     :param recurse: Should included values also be encoded?  This depends on the
                     requirements of the calling code (JSON and YAML differ).

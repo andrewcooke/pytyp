@@ -41,4 +41,6 @@ class NormalizeTest(TestCase):
         d = Delayed()
         d.set(int)
         self.assert_normal(d, d)
-        
+
+    def test_doc_bug(self):
+        self.assert_normal(Opt([int]), Opt(Seq(int)))

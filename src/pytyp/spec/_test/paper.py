@@ -46,4 +46,3 @@ if __name__ == '__main__':
 
     print(doctest.testfile('/home/andrew/project/pytyp/pytyp/pytyp.rst',
                            module_relative=False,globs=globals()))
-    

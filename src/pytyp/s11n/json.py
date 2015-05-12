@@ -90,7 +90,8 @@ def dumps(obj, **kargs):
       
     Lists, tuples and dicts of objects are also handled correctly:
     
-      >>> dumps((Example('tuple'), {'a': Example('dict'), 'b': [Example('list')]}))
+      >>> dumps((Example('tuple'), {'a': Example('dict'), 'b': [Example('list')]}),
+      ...       sort_keys=True)
       '[{"foo": "tuple"}, {"a": {"foo": "dict"}, "b": [{"foo": "list"}]}]'
       
     and this can be read back to Python classes, if the correct type specification 

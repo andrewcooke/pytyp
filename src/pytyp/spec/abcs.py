@@ -536,7 +536,7 @@ class Atr(Product, FmtArgsMixin):
             return spec
         else:
             return super().__new__(cls, *args, **kargs)
-        
+
     @classmethod
     def _vsn(cls, value):
         if hasattr(cls, '_abc_type_arguments'):

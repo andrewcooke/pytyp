@@ -26,12 +26,12 @@
 # above, a recipient may use your version of this file under either the
 # MPL or the LGPL License.
 
+from pprint import pprint
 from collections import Mapping, Sequence, Callable
 from inspect import getfullargspec
 
 from pytyp.spec.dispatch import overload
 from pytyp.spec.abcs import Seq, Sub, Rec, Cls, Opt, Alt, ANY, normalize, Atomic
-from pytyp.util import make_recursive_block
 
 
 class DecodeError(TypeError): pass
@@ -253,7 +253,8 @@ class Encoder:
       ...
       >>> myInstance = MyClass(42, 'foo')
       >>> encode = Encoder()
-      >>> encode([1,myInstance,{'a':2}])
+      >>> # use pprint to sort dicts for consistency
+      >>> pprint(encode([1,myInstance,{'a':2}]))
       [1, {'arg1': 42, 'arg2': 'foo'}, {'a': 2}]
       
     :param recurse: Should included values also be encoded?  This depends on the

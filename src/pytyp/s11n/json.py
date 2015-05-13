@@ -28,9 +28,9 @@
 
 from json import JSONDecoder as JSONDecoder_, load as load_, loads as loads_, \
     JSONEncoder as JSONEncoder_, dump as dump_, dumps as dumps_
+from pprint import pprint
 
-from pytyp.s11n.base import encode, decode, Encoder
-from pytyp.spec.abcs import Atomic
+from pytyp.s11n.base import decode, Encoder
 
 
 def dump(obj, fp, **kargs):
@@ -98,7 +98,8 @@ def dumps(obj, **kargs):
     is given to `make_loads()`: 
       
       >>> loads = make_loads((Example, {'a': Example, 'b': [Example]}))
-      >>> loads('[{"foo": "tuple"}, {"a": {"foo": "dict"}, "b": [{"foo": "list"}]}]')
+      >>> # use pprints to get consistent dict order
+      >>> pprint(loads('[{"foo": "tuple"}, {"a": {"foo": "dict"}, "b": [{"foo": "list"}]}]'))
       (<Example(tuple)>, {'a': <Example(dict)>, 'b': [<Example(list)>]})
       
     Even nested classes can be written and read back correctly - see the example for 

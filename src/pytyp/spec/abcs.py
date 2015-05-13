@@ -31,6 +31,7 @@ from collections import Sequence, Mapping, ByteString, Container
 from itertools import count
 from numbers import Number
 from reprlib import recursive_repr
+from threading import RLock
 from weakref import WeakSet, WeakKeyDictionary
 
 from pytyp.util import items, make_recursive_block
@@ -284,18 +285,19 @@ def _polymorphic_subclass(bases, args, kargs):
     kargs = dict((name, normalize(karg)) 
                  for (name, karg) in kargs.items())
     types = _hashable_types(args, kargs)
-    if types not in abc._abc_polymorphic_cache:
-        
-        # replaced a standard class definition with this to help with debugging
-        # as it was confusing when everything had the same name
-        subclass = type(abc)(abc.__name__ + '_' + str(abs(hash(types))), 
-                             tuple(list(bases) + [TypeSpec, NoNormalize]),
-                             {'_abc_type_arguments': types,
-                              '_abc_instance_registry': WeakSet(),
-                              '_abc_name': abc.__name__})
-                
-        abc._abc_polymorphic_cache[types] = subclass
-    return abc._abc_polymorphic_cache[types]
+    with abc._abc_polymorphic_cache_lock:
+        if types not in abc._abc_polymorphic_cache:
+
+            # replaced a standard class definition with this to help with debugging
+            # as it was confusing when everything had the same name
+            subclass = type(abc)(abc.__name__ + '_' + str(abs(hash(types))),
+                                 tuple(list(bases) + [TypeSpec, NoNormalize]),
+                                 {'_abc_type_arguments': types,
+                                  '_abc_instance_registry': WeakSet(),
+                                  '_abc_name': abc.__name__})
+
+            abc._abc_polymorphic_cache[types] = subclass
+        return abc._abc_polymorphic_cache[types]
 
 
 class Product:
@@ -303,7 +305,7 @@ class Product:
     @classmethod
     def _backtrack(cls, value, callback):
         return callback(cls, cls._vsn(value))
-    
+
 
 class Sum:
     
@@ -333,7 +335,8 @@ class Seq(Product):
         >>> isinstance([1,'two',None], Seq())
         True
     '''
-    
+
+    _abc_polymorphic_cache_lock = RLock()
     _abc_polymorphic_cache = {}
     
     @abstractmethod
@@ -351,7 +354,7 @@ class Seq(Product):
                 Seq().register(spec)
             return spec
         else:
-            return super().__new__(cls, *args, **kargs)
+            return super().__new__(cls)
 
     @classmethod
     def _vsn(cls, value):
@@ -402,7 +405,8 @@ class Rec(Product, FmtArgsMixin):
         >>> isinstance({foo: 1}, Rec(_dict={foo: int}))
         True
     '''
-    
+
+    _abc_polymorphic_cache_lock = RLock()
     _abc_polymorphic_cache = {}
     
     class OptKey:
@@ -454,7 +458,7 @@ class Rec(Product, FmtArgsMixin):
                 Rec().register(spec)
             return spec
         else:
-            return super().__new__(cls, *args, **kargs)
+            return super().__new__(cls)
         
     @classmethod
     def _vsn(cls, value):
@@ -520,7 +524,8 @@ class Atr(Product, FmtArgsMixin):
         >>> Cls(Bar, a=int, b=str)
         And(Cls(Bar),Atr(a=int,b=str))
     '''
-    
+
+    _abc_polymorphic_cache_lock = RLock()
     _abc_polymorphic_cache = {}
     
     @abstractmethod
@@ -535,7 +540,7 @@ class Atr(Product, FmtArgsMixin):
             spec = _polymorphic_subclass((cls,), (), kargs)
             return spec
         else:
-            return super().__new__(cls, *args, **kargs)
+            return super().__new__(cls)
 
     @classmethod
     def _vsn(cls, value):
@@ -571,7 +576,8 @@ class Alt(Sum, FmtArgsMixin):
     # this makes no sense as a mixin - it exists only to specialise the 
     # functionality provided by the Polymorphic factory above (ie to hold 
     # the cache, provide class methods, etc)
-    
+
+    _abc_polymorphic_cache_lock = RLock()
     _abc_polymorphic_cache = {}
     
     def __new__(cls, *args, **kargs):
@@ -581,7 +587,7 @@ class Alt(Sum, FmtArgsMixin):
             spec = _polymorphic_subclass((cls,), args, kargs)
             return spec
         else:
-            return super().__new__(cls, *args, **kargs)
+            return super().__new__(cls)
         
     @classmethod
     def _vsn(cls, value):
@@ -637,7 +643,7 @@ class Opt(Alt, NoNormalize):
                 Alt(*kargs).register(spec)
             return spec
         else:
-            return super().__new__(cls, *args, **kargs)
+            return super().__new__(cls)
             
     @classmethod
     def _fmt_args(cls):
@@ -747,7 +753,7 @@ class _Set(TypeSpec):
             abc._set_name = cls.__name__
             return abc
         else:
-            return super().__new__(cls, *args, **kargs)
+            return super().__new__(cls)
     
     @classmethod
     def transitive_ordered(cls, args):
@@ -802,7 +808,8 @@ class And(Product, _Set):
         >>> isinstance((1,2,3), Seq(int))
         True
     '''
-    
+
+    _abc_polymorphic_cache_lock = RLock()
     _abc_polymorphic_cache = {}
     
     
@@ -820,6 +827,7 @@ class Or(Sum, _Set):
         False
     '''
 
+    _abc_polymorphic_cache_lock = RLock()
     _abc_polymorphic_cache = {}
     
 

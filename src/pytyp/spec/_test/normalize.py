@@ -35,7 +35,8 @@ class NormalizeTest(TestCase):
     
     def assert_normal(self, spec, target):
         result = TSMeta._normalize(spec)
-        assert result == target, result 
+        assert result == target, result
+        assert result == normalize(target), normalize(target)
     
     def test_delayed(self):
         d = Delayed()

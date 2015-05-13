@@ -110,7 +110,7 @@ class SeqTest(TestCase):
                 return self.__list.__getitem__(index)
             def __len__(self):
                 return len(self.__list)
-        boo = Boo(1,'two', 3.0)
+        boo = Boo(1, 'two', 3.0)
         assert boo[1:] == ['two', 3.0]
         assert isinstance(boo, Seq)
         #assert isinstance(boo, Sequence)
@@ -177,8 +177,8 @@ class RecTest(TestCase):
         
     def test_default(self):
         assert isinstance({'a':1,'b':'two', 'c':'three'}, Rec(a=int, __=str))
-        assert not isinstance({'a':1,'b':'two', 'c':3}, Rec(a=int, __=str))
-        assert not isinstance({'a':1,'b':'two', 'c':'three'}, Rec(a=int))
+        assert not isinstance({'a':1, 'b':'two', 'c':3}, Rec(a=int, __=str))
+        assert not isinstance({'a':1, 'b':'two', 'c':'three'}, Rec(a=int))
         
     def test_register(self):
         class Baz(): pass
@@ -391,7 +391,3 @@ class BacktrackTest(TestCase):
         assert not simple_verify([1,2,None,3.0], Seq(Opt(int)))
         assert simple_verify((1, 2), And(Seq(int), Rec(int, int)))
         assert not simple_verify((1, 2), And(Seq(int), Rec(int, str)))
-    
-        
-
-

@@ -91,7 +91,7 @@ class ConfigTest(TestCase):
 class JSONEncoderTest(TestCase):
     
     def setUp(self):
-        self.__encoder = JSONEncoder()
+        self.__encoder = JSONEncoder(sort_keys=True)
     
     def assert_encode(self, value, target):
         result = self.__encoder.encode(value)
@@ -104,10 +104,10 @@ class JSONEncoderTest(TestCase):
         self.assert_encode([1,2.3], '[1, 2.3]')
         
     def test_classes(self):
-        self.assert_encode(SimpleArgs(1, 2, 3), '{"a": 1, "c": 3, "b": 2}')
-        self.assert_encode(NamedArgs(1, 2), '{"q": 2, "p": 1}')
-        self.assert_encode(MixedArgs(1, 2), '{"y": 2, "x": 1}')
+        self.assert_encode(SimpleArgs(1, 2, 3), '{"a": 1, "b": 2, "c": 3}')
+        self.assert_encode(NamedArgs(1, 2), '{"p": 1, "q": 2}')
+        self.assert_encode(MixedArgs(1, 2), '{"x": 1, "y": 2}')
         
     def test_nested(self):
         self.assert_encode(TypedArgs(NamedArgs(1, 2), SimpleArgs(1, 2, 3)), 
-                           '{"y": {"a": 1, "c": 3, "b": 2}, "x": {"q": 2, "p": 1}}')
+                           '{"x": {"p": 1, "q": 2}, "y": {"a": 1, "b": 2, "c": 3}}')

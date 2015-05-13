@@ -43,5 +43,11 @@ class NormalizeTest(TestCase):
         d.set(int)
         self.assert_normal(d, d)
 
-    def test_doc_bug(self):
+    def test_doc_bug_1(self):
         self.assert_normal(Opt([int]), Opt(Seq(int)))
+
+    def test_doc_bug_2(self):
+        class Bar: pass
+        n = normalize(Cls(Bar, a=int, b=str))
+        r = repr(n)
+        assert r == 'And(Cls(Bar),Atr(a=int,b=str))', r

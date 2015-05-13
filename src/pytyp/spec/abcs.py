@@ -102,7 +102,7 @@ class TSMeta(ABCMeta):
             else:
                 return Rec(*map(normalize, spec))
         elif isinstance(spec, dict):
-            return Rec(_dict=dict((name, normalize(spec[name])) 
+            return Rec(_dict=dict((name, normalize(spec[name]))
                                   for name in spec))
         elif isinstance(spec, tuple):
             return Rec(*tuple(normalize(s) for s in spec))
@@ -123,6 +123,8 @@ class TSMeta(ABCMeta):
             return cls._reprhook()
         except AttributeError:
             return super().__repr__()
+
+    __str__ = __repr__
         
 normalize = TSMeta._normalize
 '''
@@ -251,14 +253,6 @@ def type_error(value, spec):
     raise TypeError('Type {1} inconsistent with {0!r}.'.format(value, spec))
 
 
-def _sort_key(key):
-    key = Rec.OptKey.unpack(key)
-    if isinstance(key, int):
-        return key - 10000 # no maxint in python 3
-    else:
-        return abs(hash(key))
-    
-        
 def _hashable_types(args, kargs):
     '''
     Given a list of args and kargs, both of which are type specifications,
@@ -271,7 +265,7 @@ def _hashable_types(args, kargs):
     types = dict((name, normalize(karg)) for (name, karg) in kargs.items())
     for (index, arg) in zip(count(), args):
         types[index] = normalize(arg)
-    return tuple((key, types[key]) for key in sorted(types.keys(), key=_sort_key))
+    return tuple((key, types[key]) for key in sorted(types.keys(), key=str))
 
 
 def _unhashable_types(types):
@@ -285,6 +279,7 @@ def _polymorphic_subclass(bases, args, kargs):
     kargs = dict((name, normalize(karg)) 
                  for (name, karg) in kargs.items())
     types = _hashable_types(args, kargs)
+
     with abc._abc_polymorphic_cache_lock:
         if types not in abc._abc_polymorphic_cache:
 

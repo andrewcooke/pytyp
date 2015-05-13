@@ -39,10 +39,10 @@ def items(obj):
 
 
 def make_recursive_block(make_key=lambda args: id(args[0]), 
-                            on_recursion=lambda x: x):
+                         on_recursion=lambda x: x):
 
     def recursive_block(function):
-    
+
         running = set()
     
         @wraps(function)

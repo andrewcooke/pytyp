@@ -266,7 +266,7 @@ class TypedDict(dict):
     def __repr__(self):
         if not self:
             return '%s()' % (self.__class__.__name__,)
-        return '%s(%r)' % (self.__class__.__name__, list(self.typed_items()))
+        return '%s(%r)' % (self.__class__.__name__, sorted(list(self.typed_items()), key=str))
 
 
 if __name__ == "__main__":

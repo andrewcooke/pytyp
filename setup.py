@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='pytyp',
-      version='2.2',
+      version='2.2.2',
       description='Pythonic type metadata; declarative JSON and YAML transcoding.',
       long_description='''
 Pytyp uses ABCs and function annotations in a consistent, pythonic way that
@@ -36,6 +36,9 @@ It includes:
 
 The ideas behind the library are described in more detail in `Algebraic ABCs
 <http://www.acooke.org/pytyp.pdf>`_.
+
+Note that you must also install `PyYAML
+<https://pypi.python.org/pypi/PyYAML>`_ if you want to encode/decode YAML.
 ''',
       author='Andrew Cooke',
       author_email='andrew@acooke.org',

@@ -136,7 +136,21 @@ try:
         return load_all
 
 except ImportError:
-    pass
+
+    def _lazy():
+        raise ImportError('Please install PyYAML - eg easy_install pyyaml')
+
+    def dump(data, stream=None, **kargs):
+        _lazy()
+
+    def dump_all(data, stream=None, **kargs):
+        _lazy()
+
+    def make_load(spec):
+        _lazy()
+
+    def make_load_all(spec):
+        _lazy()
 
 
 if __name__ == "__main__":

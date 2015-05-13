@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='pytyp',
-      version='2.1',
+      version='2.2',
       description='Pythonic type metadata; declarative JSON and YAML transcoding.',
       long_description='''
 Pytyp uses ABCs and function annotations in a consistent, pythonic way that

@@ -36,9 +36,6 @@ Use attributes instead of ``[]``, and vice versa
    The ideas behind this library are described in the paper `Algebraic ABCs
    <http://www.acooke.org/pytyp.pdf>`_.
 
-   The library has been almost completely rewritten for the 2.0 release.
-   Public APIs have changed.  You may need to fix your code when updating.
-
 Installation and Support
 ------------------------
 
@@ -50,8 +47,8 @@ To install from `PyPI <http://pypi.python.org/pypi/pytyp>`_::
 
    This project is Python 3 **only**.
 
-For source see `Google Code <http://code.google.com/p/pytyp/>`_; for support
-email `Andrew Cooke <mailto:andrew@acooke.org>`_.
+For source see `github <https://github.com/andrewcooke/pytyp>`_; for support
+raise an issue there or email `Andrew Cooke <mailto:andrew@acooke.org>`_.
 
 Contents
 --------

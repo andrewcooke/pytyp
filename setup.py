@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='pytyp',
-      version='2.0',
+      version='2.1',
       description='Pythonic type metadata; declarative JSON and YAML transcoding.',
       long_description='''
 Pytyp uses ABCs and function annotations in a consistent, pythonic way that
@@ -53,6 +53,8 @@ The ideas behind the library are described in more detail in `Algebraic ABCs
                    'Programming Language :: Python :: 3.0',
                    'Programming Language :: Python :: 3.1',
                    'Programming Language :: Python :: 3.2',
+                   'Programming Language :: Python :: 3.3',
+                   'Programming Language :: Python :: 3.4',
                    'Topic :: Software Development',
                    'Topic :: Software Development :: Libraries',
                    'Topic :: Software Development :: Libraries :: Python Modules',

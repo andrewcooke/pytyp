@@ -44,5 +44,5 @@ if __name__ == '__main__':
         def __init__(self, *args): list.__init__(self, args)
         def __hash__(self): return 0
 
-    print(doctest.testfile('/home/andrew/project/pytyp/pytyp/pytyp.rst',
+    print(doctest.testfile('/home/andrew/project/pytyp/pytyp.rst',
                            module_relative=False,globs=globals()))

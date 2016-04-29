@@ -36,6 +36,12 @@ Use attributes instead of ``[]``, and vice versa
    The ideas behind this library are described in the paper `Algebraic ABCs
    <http://www.acooke.org/pytyp.pdf>`_.
 
+.. warning::
+
+   This package is unused and largely unmaintained.  Python went in a
+   `different direction <https://www.python.org/dev/peps/pep-0484/>`_
+   with types.
+
 Installation and Support
 ------------------------
 

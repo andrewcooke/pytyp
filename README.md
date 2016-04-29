@@ -12,3 +12,7 @@ To install from [Pypi](https://pypi.python.org/pypi/pytyp):
 ```
 easy_install pytyp
 ```
+
+Warning: this is unused and largely unmaintained.  Python went in a
+[different direction](https://www.python.org/dev/peps/pep-0484/) with
+types.
